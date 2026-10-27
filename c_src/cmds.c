@@ -1,0 +1,340 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include "cmds.h"
+#include "control.h"
+#include "util.h"
+#include "display/display.h"
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+
+int cmd_is_key(const char *key)
+{
+    static const char *const keys[] = {
+        "profile", "ac-profile", "battery-profile", "epp", "freq", "hz",
+        "battery", "battery-oneshot", "ppt", "nv-boost", "nv-temp",
+        "gpu-clock", "panel-od", "cpu-boost", "kbd", "aura", "fan",
+        "fan-curve", "fan-write", NULL
+    };
+    if (!key || !key[0])
+        return 0;
+    for (int i = 0; keys[i]; i++)
+        if (!strcasecmp(key, keys[i]))
+            return 1;
+    return 0;
+}
+
+int cmd_parse_bool(const char *s)
+{
+    if (!s)
+        return -1;
+    if (!strcasecmp(s, "on") || !strcasecmp(s, "1") || !strcasecmp(s, "true"))
+        return 1;
+    if (!strcasecmp(s, "off") || !strcasecmp(s, "0") || !strcasecmp(s, "false"))
+        return 0;
+    return -1;
+}
+
+static void errf(char *err, size_t errn, const char *fmt, ...)
+{
+    if (!err || errn == 0)
+        return;
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(err, errn, fmt, ap);
+    va_end(ap);
+}
+
+/* PPT token: Q45 | B60 | P80 | off | on | spl,sppt,fppt */
+static int cmd_ppt(hw_state_t *hw, const char *val, char *err, size_t errn)
+{
+    if (!strcasecmp(val, "Q45"))
+        return ctrl_set_ppt(hw, 45, 55, 55);
+    if (!strcasecmp(val, "B60"))
+        return ctrl_set_ppt(hw, 60, 75, 75);
+    if (!strcasecmp(val, "P80"))
+        return ctrl_set_ppt(hw, 80, 80, 80);
+    if (!strcasecmp(val, "off"))
+        return ctrl_ppt_off(hw);
+    if (!strcasecmp(val, "on"))
+        return ctrl_ppt_restore(hw);
+    int a, b, c;
+    if (sscanf(val, "%d,%d,%d", &a, &b, &c) == 3)
+        return ctrl_set_ppt(hw, a, b, c);
+    errf(err, errn, "ppt: expected Q45|B60|P80|off|on or spl,sppt,fppt");
+    return -1;
+}
+
+/* "cpu 40,60 80,120" or "gpu 40,60 80,120" */
+static int cmd_fan_curve(hw_state_t *hw, const char *val, char *err, size_t errn)
+{
+    char which[8] = {0}, temps[128] = {0}, pwms[128] = {0};
+    int n = sscanf(val, "%7s %127s %127s", which, temps, pwms);
+    if (n != 3 || (strcasecmp(which, "cpu") && strcasecmp(which, "gpu"))) {
+        errf(err, errn, "fan-curve: expected 'cpu|gpu <temps> <pwms>'");
+        return -1;
+    }
+    fan_curve_t *fc = strcasecmp(which, "gpu") ? &hw->fan_cpu : &hw->fan_gpu;
+    if (fan_from_csv(fc, temps, pwms) < 0) {
+        errf(err, errn, "fan-curve: bad csv");
+        return -1;
+    }
+    hw->fan_staged = true; /* staged intent: a live refresh must not clobber */
+    return 0;
+}
+
+/* "static", "static red", "static ffaabb" */
+static int cmd_aura(hw_state_t *hw, const char *val, char *err, size_t errn)
+{
+    char eff[32] = {0}, col[32] = {0};
+    if (sscanf(val, "%31s %31s", eff, col) < 1) {
+        errf(err, errn, "aura: expected effect [color|hex]");
+        return -1;
+    }
+    int e = ctrl_aura_effect_idx(eff);
+    if (e < 0) {
+        errf(err, errn, "aura: unknown effect '%s'", eff);
+        return -1;
+    }
+    if (!col[0])
+        return ctrl_set_aura(hw, e, 0);
+    /* hex? */
+    if (strspn(col, "0123456789abcdefABCDEF") == strlen(col) && strlen(col) == 6)
+        return ctrl_set_aura_hex(hw, col);
+    for (int i = 0; i < AURA_COLOR_COUNT; i++) {
+        if (!strcasecmp(col, AURA_COLOR_NAMES[i]))
+            return ctrl_set_aura(hw, e, i);
+    }
+    errf(err, errn, "aura: unknown color '%s'", col);
+    return -1;
+}
+
+static int cmd_hz(hw_state_t *hw, const char *val, char *err, size_t errn)
+{
+    int hz;
+    if (!strcasecmp(val, "max")) {
+        hz = 0;
+        for (int i = 0; i < hw->hz_count; i++)
+            if (hw->hz_modes[i] > hz)
+                hz = hw->hz_modes[i];
+        if (hz == 0)
+            hz = hw->hz_cur > 0 ? hw->hz_cur : 60;
+    } else {
+        hz = atoi(val);
+    }
+    /* garbage guard only — the upper side must stay above any real
+     * panel (540 Hz exists today): ctrl_set_hz snaps to the nearest
+     * supported mode anyway, so overshooting is harmless */
+    if (hz < 30 || hz > 2000) {
+        errf(err, errn, "hz: bad value '%s'", val);
+        return -1;
+    }
+    return ctrl_set_hz(hw, hz);
+}
+
+int cmd_run(hw_state_t *hw, const char *key, const char *val,
+            char *err, size_t errn)
+{
+    if (!key)
+        return -1;
+    if (err && errn)
+        err[0] = '\0';
+    if (!val)
+        val = "";
+
+    if (!strcasecmp(key, "profile")) {
+        int p = hw_profile_from_name(val);
+        if (p < 0) {
+            errf(err, errn, "profile: quiet|balanced|performance");
+            return -1;
+        }
+        return ctrl_set_profile(hw, (hw_profile_t)p);
+    }
+    if (!strcasecmp(key, "ac-profile") || !strcasecmp(key, "battery-profile")) {
+        int v;
+        if (!strcasecmp(val, "off"))
+            v = -1;
+        else {
+            v = hw_profile_from_name(val);
+            if (v < 0) {
+                errf(err, errn, "%s: off|quiet|balanced|performance", key);
+                return -1;
+            }
+        }
+        bool is_ac = !strcasecmp(key, "ac-profile");
+        return ctrl_set_asusd_auto(hw, is_ac ? v : -2, is_ac ? -2 : v);
+    }
+    if (!strcasecmp(key, "epp")) {
+        int e = hw_epp_from_name(val);
+        if (e < 0) {
+            errf(err, errn, "epp: power|balance_power|balance_performance|performance");
+            return -1;
+        }
+        return ctrl_set_epp(hw, (hw_epp_t)e);
+    }
+    if (!strcasecmp(key, "freq")) {
+        int cpu, mhz;
+        if (sscanf(val, "core %d %d", &cpu, &mhz) == 2) {
+            /* `cpu` is a kernel cpu number (present ids, not 0..N) */
+            if (!hw_cpu_present(hw, cpu) || mhz < 100 || mhz > 10000) {
+                errf(err, errn, "freq: core <kernel cpu id> <MHz>");
+                return -1;
+            }
+            return ctrl_set_cpu_max_mhz_core(hw, cpu, mhz);
+        }
+        {
+            int ccd;
+            if (sscanf(val, "ccd %d %d", &ccd, &mhz) == 2) {
+                int rc = 0, n = 0, k;
+                if (hw->topo_odd || ccd < 0 || ccd >= hw->ccd_n ||
+                    mhz < 100 || mhz > 10000) {
+                    errf(err, errn, "freq: ccd <0..%d> <MHz>",
+                         hw->ccd_n > 0 ? hw->ccd_n - 1 : 0);
+                    return -1;
+                }
+                for (k = 0; k < hw->core_n && k < HW_CPU_MAX; k++) {
+                    int sib;
+                    if (hw->core_ccd[k] != ccd)
+                        continue;
+                    n++;
+                    if (ctrl_set_cpu_max_mhz_core(hw, hw->core_cpu[k], mhz) != 0)
+                        rc = -1;
+                    sib = hw->core_sib[k];
+                    if (sib >= 0 &&
+                        ctrl_set_cpu_max_mhz_core(hw, sib, mhz) != 0)
+                        rc = -1;
+                }
+                if (n == 0) {
+                    errf(err, errn, "freq: ccd %d has no cores", ccd);
+                    return -1;
+                }
+                return rc;
+            }
+        }
+        mhz = atoi(val);
+        if (mhz < 100 || mhz > 10000) {
+            errf(err, errn, "freq: <MHz> | core <id> <MHz> | ccd <n> <MHz>");
+            return -1;
+        }
+        return ctrl_set_cpu_max_mhz(hw, mhz);
+    }
+    if (!strcasecmp(key, "hz"))
+        return cmd_hz(hw, val, err, errn);
+    if (!strcasecmp(key, "battery")) {
+        int pct = atoi(val);
+        if (pct < 20 || pct > 100) {
+            errf(err, errn, "battery: 20..100");
+            return -1;
+        }
+        return ctrl_set_battery_limit(hw, pct);
+    }
+    if (!strcasecmp(key, "battery-oneshot"))
+        return ctrl_battery_oneshot();
+    if (!strcasecmp(key, "ppt"))
+        return cmd_ppt(hw, val, err, errn);
+    if (!strcasecmp(key, "nv-boost")) {
+        int w = atoi(val);
+        if (w < 5 || w > 25) {
+            errf(err, errn, "nv-boost: 5..25 W");
+            return -1;
+        }
+        return ctrl_set_nv_boost(hw, w);
+    }
+    if (!strcasecmp(key, "nv-temp")) {
+        int t = atoi(val);
+        if (t < 75 || t > 87) {
+            errf(err, errn, "nv-temp: 75..87 °C");
+            return -1;
+        }
+        return ctrl_set_nv_temp(hw, t);
+    }
+    if (!strcasecmp(key, "gpu-clock")) {
+        int rc;
+        if (!strcasecmp(val, "reset") || !strcasecmp(val, "off")) {
+            rc = ctrl_gpu_clock_reset(hw);
+            if (rc != 0)
+                errf(err, errn, "gpu-clock: reset FAILED (see the log)");
+            return rc;
+        }
+        int mhz = atoi(val);
+        if (mhz < 200 || mhz > 4096) {
+            errf(err, errn, "gpu-clock: 200..4096 MHz | reset");
+            return -1;
+        }
+        rc = ctrl_gpu_clock_lock(hw, mhz);
+        if (rc != 0)
+            errf(err, errn, "gpu-clock: lock FAILED (see the log)");
+        return rc;
+    }
+    if (!strcasecmp(key, "panel-od")) {
+        int on = cmd_parse_bool(val);
+        if (on < 0) {
+            errf(err, errn, "panel-od: on|off");
+            return -1;
+        }
+        return ctrl_set_panel_od(hw, on != 0);
+    }
+    if (!strcasecmp(key, "cpu-boost")) {
+        int on = cmd_parse_bool(val);
+        if (on < 0) {
+            errf(err, errn, "cpu-boost: on|off");
+            return -1;
+        }
+        return ctrl_set_cpu_boost(hw, on != 0);
+    }
+    if (!strcasecmp(key, "kbd")) {
+        int k = hw_kbd_from_name(val);
+        if (k < 0) {
+            errf(err, errn, "kbd: off|low|med|high");
+            return -1;
+        }
+        return ctrl_set_kbd(hw, (hw_kbd_t)k);
+    }
+    if (!strcasecmp(key, "aura"))
+        return cmd_aura(hw, val, err, errn);
+    if (!strcasecmp(key, "fan")) {
+        if (!strcasecmp(val, "stock"))
+            return ctrl_fan_preset(hw, 0);
+        if (!strcasecmp(val, "silent"))
+            return ctrl_fan_preset(hw, 1);
+        if (!strcasecmp(val, "cool"))
+            return ctrl_fan_preset(hw, 2);
+        if (!strcasecmp(val, "full"))
+            return ctrl_fan_preset(hw, 3);
+        if (!strcasecmp(val, "on"))
+            return ctrl_fan_set_enabled(hw, true, true);
+        if (!strcasecmp(val, "off"))
+            return ctrl_fan_set_enabled(hw, false, false);
+        {
+            char side[8] = {0}, sw[8] = {0};
+            int on;
+            if (sscanf(val, "%7s %7s", side, sw) == 2 &&
+                (!strcasecmp(side, "cpu") || !strcasecmp(side, "gpu"))) {
+                on = cmd_parse_bool(sw);
+                if (on < 0) {
+                    errf(err, errn, "fan: cpu|gpu on|off");
+                    return -1;
+                }
+                /* the other side must be the live switch, not a stale
+                 * saved flag, or this write turns it the wrong way */
+                hw_refresh_live(hw);
+                if (!strcasecmp(side, "cpu"))
+                    return ctrl_fan_set_enabled(hw, on != 0, hw->fan_gpu_on);
+                return ctrl_fan_set_enabled(hw, hw->fan_cpu_on, on != 0);
+            }
+        }
+        errf(err, errn, "fan: stock|silent|cool|full|on|off|cpu on|gpu off");
+        return -1;
+    }
+    if (!strcasecmp(key, "fan-curve"))
+        return cmd_fan_curve(hw, val, err, errn);
+    if (!strcasecmp(key, "fan-write"))
+        return ctrl_fan_write(hw);
+
+    errf(err, errn, "unknown key '%s'", key);
+    return -1;
+}

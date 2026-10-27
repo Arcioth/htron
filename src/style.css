@@ -1,0 +1,339 @@
+/* =========================================================================
+ * htron — "ICE SERPENT (CRYO-OPHIDIAN)" GTK4 / LIBADWAITA THEME
+ * Palette:
+ *   Abyssal Trench      : #04080e
+ *   Obsidian Scale      : #08121d
+ *   Glacial Belly       : #0c1c2c
+ *   Frosted Ridge       : #132a40
+ *   Bioluminescent Fang : #00f0ff
+ *   Permafrost Crystal  : #ccfffe
+ *   Serpent Turquoise   : #14b8a6
+ *   Venom Frost Violet  : #a78bfa
+ *   Thermal Fang Ember  : #fb7185
+ * ========================================================================= */
+
+window,
+.htron-window {
+    background-color: #04080e;
+    background-image: linear-gradient(155deg, #04080e 0%, #07121e 52%, #050c14 100%);
+    color: #e2f8fb;
+    font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", "Inter", sans-serif;
+}
+
+/* Top Cryo Header Bar */
+.serpent-header {
+    background-color: #060f19;
+    background-image: linear-gradient(90deg, #060e18 0%, #0b1c2c 50%, #060e18 100%);
+    border-bottom: 1px solid rgba(0, 240, 255, 0.22);
+    padding: 8px 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.65);
+}
+
+.brand-title {
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    color: #ccfffe;
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.45);
+}
+
+.brand-subtitle {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.6px;
+    color: #2dd4bf;
+    opacity: 0.85;
+}
+
+/* Telemetry Sensor Pills in Header */
+.sensor-pill {
+    background-color: rgba(12, 28, 44, 0.88);
+    background-image: linear-gradient(180deg, rgba(20, 184, 166, 0.12) 0%, rgba(4, 8, 14, 0.6) 100%);
+    border: 1px solid rgba(126, 249, 255, 0.22);
+    border-radius: 8px;
+    padding: 4px 11px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #ccfffe;
+}
+
+.sensor-pill-hot {
+    background-color: rgba(45, 12, 24, 0.88);
+    border: 1px solid rgba(251, 113, 133, 0.55);
+    color: #fda4af;
+}
+
+.sensor-pill-venom {
+    background-color: rgba(24, 18, 48, 0.85);
+    border: 1px solid rgba(167, 139, 250, 0.35);
+    color: #ddd6fe;
+}
+
+/* Left Navigation Rail — Serpent Spine */
+.serpent-rail {
+    background-color: #050c14;
+    background-image: linear-gradient(180deg, #06101b 0%, #04080e 100%);
+    border-right: 1px solid rgba(0, 240, 255, 0.16);
+    padding: 14px 10px;
+}
+
+.rail-section-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #38bdf8;
+    opacity: 0.65;
+    margin: 8px 8px 4px 8px;
+}
+
+.nav-scale-btn {
+    background-color: rgba(10, 22, 34, 0.65);
+    background-image: none;
+    border: 1px solid rgba(126, 249, 255, 0.08);
+    border-left: 3px solid transparent;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin: 3px 0;
+    color: #94bac8;
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 160ms ease;
+}
+
+.nav-scale-btn:hover {
+    background-color: rgba(15, 35, 54, 0.92);
+    border-color: rgba(0, 240, 255, 0.28);
+    border-left: 3px solid #2dd4bf;
+    color: #ccfffe;
+}
+
+.nav-scale-btn-active {
+    background-color: rgba(14, 42, 62, 0.95);
+    background-image: linear-gradient(90deg, rgba(0, 240, 255, 0.18) 0%, rgba(20, 184, 166, 0.04) 100%);
+    border: 1px solid rgba(0, 240, 255, 0.45);
+    border-left: 4px solid #00f0ff;
+    color: #ffffff;
+    font-weight: 800;
+    box-shadow: 0 0 14px rgba(0, 240, 255, 0.16);
+}
+
+/* Serpent Scale Cards & Glacial Panels */
+.serpent-card {
+    background-color: #08131f;
+    background-image: linear-gradient(145deg, rgba(16, 38, 58, 0.72) 0%, rgba(7, 16, 26, 0.94) 100%);
+    border: 1px solid rgba(126, 249, 255, 0.16);
+    border-top: 1px solid rgba(204, 255, 254, 0.30);
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.48);
+}
+
+.serpent-card-Interactive:hover {
+    border-color: rgba(0, 240, 255, 0.42);
+}
+
+.frost-panel {
+    background-color: rgba(6, 14, 23, 0.85);
+    border: 1px solid rgba(45, 212, 191, 0.18);
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.card-title {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #7ef9ff;
+}
+
+.card-subtitle {
+    font-size: 11px;
+    color: #7da5b8;
+}
+
+.metric-huge {
+    font-size: 24px;
+    font-weight: 800;
+    color: #ccfffe;
+}
+
+.metric-unit {
+    font-size: 12px;
+    font-weight: 600;
+    color: #2dd4bf;
+}
+
+.dim-label {
+    color: #64899c;
+    font-size: 11px;
+}
+
+/* Cryo Action Buttons */
+button.cryo-btn {
+    background-color: #0c2133;
+    background-image: linear-gradient(180deg, #12314a 0%, #091929 100%);
+    border: 1px solid rgba(126, 249, 255, 0.25);
+    border-radius: 8px;
+    padding: 6px 13px;
+    color: #ccfffe;
+    font-weight: 700;
+    font-size: 12px;
+    transition: all 140ms ease;
+}
+
+button.cryo-btn:hover {
+    background-image: linear-gradient(180deg, #184363 0%, #0d263d 100%);
+    border-color: #00f0ff;
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
+}
+
+button.cryo-btn:active,
+button.cryo-btn-active {
+    background-color: #00f0ff;
+    background-image: linear-gradient(135deg, #00f0ff 0%, #14b8a6 100%);
+    border-color: #ccfffe;
+    color: #04080e;
+    font-weight: 800;
+    box-shadow: 0 0 14px rgba(0, 240, 255, 0.42);
+}
+
+button.fang-action-btn {
+    background-color: #0d9488;
+    background-image: linear-gradient(135deg, #00f0ff 0%, #0d9488 100%);
+    border: 1px solid #ccfffe;
+    border-radius: 9px;
+    padding: 8px 18px;
+    color: #03070c;
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.8px;
+    box-shadow: 0 0 16px rgba(0, 240, 255, 0.32);
+}
+
+button.fang-action-btn:hover {
+    background-image: linear-gradient(135deg, #ccfffe 0%, #2dd4bf 100%);
+    box-shadow: 0 0 22px rgba(0, 240, 255, 0.55);
+}
+
+button.ember-btn {
+    background-color: rgba(136, 19, 55, 0.65);
+    background-image: linear-gradient(180deg, rgba(190, 18, 60, 0.75) 0%, rgba(76, 5, 25, 0.85) 100%);
+    border: 1px solid rgba(251, 113, 133, 0.5);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: #ffe4e6;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+button.ember-btn:hover {
+    border-color: #fb7185;
+    background-color: rgba(190, 18, 60, 0.95);
+}
+
+/* Badges & Step Chips */
+.cryo-chip {
+    background-color: rgba(0, 240, 255, 0.12);
+    border: 1px solid rgba(0, 240, 255, 0.35);
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #ccfffe;
+}
+
+.venom-chip {
+    background-color: rgba(167, 139, 250, 0.14);
+    border: 1px solid rgba(167, 139, 250, 0.42);
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #ede9fe;
+}
+
+.staged-banner {
+    background-color: rgba(20, 184, 166, 0.18);
+    border: 1px solid #00f0ff;
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: #ccfffe;
+    font-weight: 800;
+    font-size: 12px;
+}
+
+/* Sliders (GtkScale) */
+scale trough {
+    background-color: #050d16;
+    border: 1px solid rgba(126, 249, 255, 0.18);
+    border-radius: 6px;
+    min-height: 8px;
+}
+
+scale highlight {
+    background-color: #00f0ff;
+    background-image: linear-gradient(90deg, #0d9488 0%, #00f0ff 75%, #ccfffe 100%);
+    border-radius: 6px;
+}
+
+scale slider {
+    background-color: #ccfffe;
+    border: 2px solid #00f0ff;
+    border-radius: 50%;
+    min-width: 16px;
+    min-height: 16px;
+    box-shadow: 0 0 8px rgba(0, 240, 255, 0.65);
+}
+
+/* Entries & Inputs */
+entry {
+    background-color: #050c14;
+    border: 1px solid rgba(126, 249, 255, 0.24);
+    border-radius: 8px;
+    color: #ccfffe;
+    padding: 6px 10px;
+}
+
+entry:focus {
+    border-color: #00f0ff;
+    box-shadow: 0 0 8px rgba(0, 240, 255, 0.35);
+}
+
+/* Track / Browser Rows */
+.track-row {
+    background-color: rgba(8, 19, 31, 0.65);
+    border: 1px solid rgba(126, 249, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 2px 0;
+}
+
+.track-row:hover {
+    background-color: rgba(16, 40, 62, 0.9);
+    border-color: rgba(0, 240, 255, 0.35);
+}
+
+.track-row-playing {
+    background-color: rgba(13, 52, 66, 0.92);
+    border: 1px solid #00f0ff;
+    border-left: 4px solid #00f0ff;
+}
+
+/* Persistent Bottom Cryo-Player Bar */
+.cryo-dock {
+    background-color: #050d17;
+    background-image: linear-gradient(90deg, #040a12 0%, #0a1b2b 50%, #040a12 100%);
+    border-top: 1px solid rgba(0, 240, 255, 0.28);
+    padding: 10px 18px;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.75);
+}
+
+/* Status Footer Bar */
+.status-strip {
+    background-color: #03070b;
+    border-top: 1px solid rgba(126, 249, 255, 0.12);
+    padding: 4px 14px;
+    font-size: 11px;
+    color: #6495a8;
+}

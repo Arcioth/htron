@@ -1,0 +1,34 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=htron
+GenericName=Hyprland Hardware & Audio Suite
+Comment=Native GTK4/Libadwaita desktop suite unifying ctron, daeboard, and tunotron
+Exec=/home/arcioth/.local/bin/htron
+Icon=htron
+Terminal=false
+Categories=System;HardwareSettings;AudioVideo;Audio;Player;
+Keywords=asus;tuf;fan;daeboard;tunotron;hyprland;htron;
+StartupNotify=true
+StartupWMClass=dev.arcioth.htron
+Actions=Status;TunotronView;DaeboardView;TurboMode;SilentMode;
+
+[Desktop Action Status]
+Name=Print Hardware Status
+Exec=/home/arcioth/.local/bin/htron --status
+
+[Desktop Action TunotronView]
+Name=Open Tunotron Audio Deck
+Exec=/home/arcioth/.local/bin/htron --view tunotron
+
+[Desktop Action DaeboardView]
+Name=Open Daeboard RGB & Macro Studio
+Exec=/home/arcioth/.local/bin/htron --view daeboard
+
+[Desktop Action TurboMode]
+Name=Apply Mode: Turbo
+Exec=/home/arcioth/.local/bin/htron --mode turbo
+
+[Desktop Action SilentMode]
+Name=Apply Mode: Silent
+Exec=/home/arcioth/.local/bin/htron --mode silent

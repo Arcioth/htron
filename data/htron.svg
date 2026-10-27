@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="abyss" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050b12"/>
+      <stop offset="50%" stop-color="#091724"/>
+      <stop offset="100%" stop-color="#04080d"/>
+    </linearGradient>
+    <linearGradient id="serpent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ccfffe"/>
+      <stop offset="40%" stop-color="#00f0ff"/>
+      <stop offset="80%" stop-color="#14b8a6"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="fang" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#7ef9ff"/>
+      <stop offset="100%" stop-color="#0d9488"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Hexagonal Cryo Shield Base -->
+  <polygon points="128,12 232,68 232,188 128,244 24,188 24,68"
+           fill="url(#abyss)" stroke="url(#serpent)" stroke-width="5"/>
+  <polygon points="128,24 220,74 220,182 128,232 36,182 36,74"
+           fill="none" stroke="#7ef9ff" stroke-opacity="0.22" stroke-width="1.5"/>
+
+  <!-- Geometric Ice Serpent Coils (Stylized H + Serpent Spine) -->
+  <path d="M72,62 L96,48 L96,116 L160,116 L160,48 L184,62 L184,194 L160,208 L160,140 L96,140 L96,208 L72,194 Z"
+        fill="url(#serpent)" opacity="0.18"/>
+
+  <!-- Coiling Serpent Body -->
+  <path d="M128,38 L168,62 L152,96 L104,128 L152,160 L168,194 L128,218 L88,194 L104,160 L152,128 L104,96 L88,62 Z"
+        fill="none" stroke="url(#serpent)" stroke-width="10" stroke-linejoin="miter" filter="url(#glow)"/>
+
+  <!-- Serpent Crown & Fangs -->
+  <polygon points="128,30 156,52 142,78 128,66 114,78 100,52" fill="url(#fang)"/>
+  <polygon points="110,74 118,104 124,78" fill="#ccfffe"/>
+  <polygon points="146,74 138,104 132,78" fill="#ccfffe"/>
+
+  <!-- Bioluminescent Serpent Eyes -->
+  <polygon points="112,54 123,59 115,64" fill="#04080d"/>
+  <polygon points="144,54 133,59 141,64" fill="#04080d"/>
+  <circle cx="116" cy="59" r="2.2" fill="#00f0ff"/>
+  <circle cx="140" cy="59" r="2.2" fill="#00f0ff"/>
+
+  <!-- Center Cryo Diamond Core -->
+  <polygon points="128,110 144,128 128,146 112,128" fill="#ccfffe" filter="url(#glow)"/>
+</svg>

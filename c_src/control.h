@@ -1,0 +1,112 @@
+#ifndef CTRON_CONTROL_H
+#define CTRON_CONTROL_H
+
+#include <stdbool.h>
+
+#include "hw.h"
+
+/* Write layer. Every function applies a user-requested change through the
+ * privilege chain (asusctl -> direct sysfs -> sudo -n) and updates the
+ * in-memory state on success. Nothing here is called from poll loops. */
+
+/* ---- platform -------------------------------------------------------- */
+
+int ctrl_set_profile(hw_state_t *hw, hw_profile_t p);
+/* asusd power-source takeover: -2 leave alone, -1 off, 0..2 enforce
+ * that profile on that power source; verified by read-back */
+int ctrl_set_asusd_auto(hw_state_t *hw, int ac, int bat);
+int ctrl_set_epp(hw_state_t *hw, hw_epp_t e);
+int ctrl_set_cpu_max_mhz(hw_state_t *hw, int mhz);
+/* per-core scaling_max_freq; read-back verified, -1 on bad cpu id */
+int ctrl_set_cpu_max_mhz_core(hw_state_t *hw, int cpu, int mhz);
+int ctrl_set_cpu_boost(hw_state_t *hw, bool on);
+
+/* ---- power ------------------------------------------------------------ */
+
+/* Watts. Values are clamped to the resolved limits; invariant
+ * fppt >= sppt >= spl is enforced. */
+void ctrl_ppt_limits(const hw_state_t *hw,
+                     int *spl_min, int *spl_max,
+                     int *sppt_min, int *sppt_max,
+                     int *fppt_min, int *fppt_max);
+/* Clamp each value into its window, then enforce fppt >= sppt >= spl —
+ * exactly what the write path will do. Shared with the POWER staging
+ * so what is staged is what gets written. */
+void ctrl_ppt_order(int *spl, int *sppt, int *fppt,
+                    int smin, int smax, int pmin, int pmax,
+                    int fmin, int fmax);
+int ctrl_set_ppt(hw_state_t *hw, int spl, int sppt, int fppt);
+/* Remove the watt limits (write the platform maxima, remembering the
+ * current values) and put them back afterwards. */
+int ctrl_ppt_off(hw_state_t *hw);
+int ctrl_ppt_restore(hw_state_t *hw);
+/* Pure: the ryzenadj invocation for a watt triple (W in, mW out) as an
+ * argv vector — no shell string anywhere. SECURITY INVARIANT: fixed
+ * flag order, integers only — SPL→STAPM (-a), SPPT→SLOW (-c),
+ * FPPT→FAST (-b); ctron never passes any other ryzenadj flag. The
+ * three integer words live in bufs; av comes back NULL-terminated.
+ * Unit-tested. */
+void ctrl_ppt_ryzen_argv(const char *path, int spl, int sppt, int fppt,
+                         const char *av[10], char bufs[3][16]);
+/* The stricter sudoers path (SECURITY.md §4.3): a root-owned wrapper
+ * that only ever takes three mW integers. Probed FIRST when present
+ * and executable, so an installed wrapper hides ryzenadj from ctron
+ * entirely. Same argv contract. Unit-tested. */
+#define CTRON_PPT_WRAPPER "/usr/local/bin/ctron-ppt"
+void ctrl_ppt_wrapper_argv(const char *path, int spl, int sppt, int fppt,
+                           const char *av[7], char bufs[3][16]);
+int ctrl_set_nv_boost(hw_state_t *hw, int watts);
+int ctrl_set_nv_temp(hw_state_t *hw, int celsius);
+int ctrl_set_panel_od(hw_state_t *hw, bool on);
+int ctrl_set_battery_limit(hw_state_t *hw, int pct);
+int ctrl_battery_oneshot(void);
+
+/* GPU core-clock lock (nvidia-smi -lgc): an indirect watt lever —
+ * laptop power limits are locked, so capping the core clock caps the
+ * draw. Lock verified by current-clock sampling (the driver exposes
+ * no lock flag); reset is rc-verified only. */
+int ctrl_gpu_clock_lock(hw_state_t *hw, int mhz);
+int ctrl_gpu_clock_reset(hw_state_t *hw);
+/* Pure: 1 when every sample (csv) stays at or below the lock (+2 MHz
+ * grid-rounding slack). Unit-tested. */
+int ctrl_gpu_clock_ok(int mhz, const char *samples);
+
+/* ---- display ---------------------------------------------------------- */
+
+int ctrl_set_hz(hw_state_t *hw, int hz);   /* nearest supported mode */
+
+/* ---- keyboard / aura --------------------------------------------------- */
+
+int ctrl_set_kbd(hw_state_t *hw, hw_kbd_t lvl);
+int ctrl_set_aura(hw_state_t *hw, int effect_idx, int color_idx);
+int ctrl_set_aura_hex(hw_state_t *hw, const char *hex);
+
+extern const char *const AURA_EFFECTS[];
+extern const int AURA_EFFECT_COUNT;
+extern const char *const AURA_COLOR_NAMES[];
+extern const char *const AURA_COLOR_HEX[];
+extern const int AURA_COLOR_COUNT;
+int ctrl_aura_effect_idx(const char *name);
+
+/* ---- fans --------------------------------------------------------------- */
+
+/* Pure outcome classification for ctrl_fan_write, unit-tested:
+ *   rc     sysfs-side result (-1 = write or enable read-back failed)
+ *   vok_*  verified point counts, -1 = no fan hwmon
+ *   a_ok   asusctl outcome: -1 not attempted, 1 ok, 0 errored */
+typedef enum {
+    FAN_W_VERIFIED,    /* written + verified: clear staging, success */
+    FAN_W_VERIFY_FAIL, /* written, read-back mismatch: keep staging */
+    FAN_W_ASUSCTL,     /* applied via asusd only (no read-back) */
+    FAN_W_FAILED,      /* nothing landed anywhere: keep staging, fail */
+} fan_write_verdict_t;
+
+fan_write_verdict_t fan_write_verdict(int rc, int vok_cpu, int vok_gpu, int a_ok);
+
+/* Write in-memory curves to the EC (sysfs) and to asusctl (persistence). */
+int ctrl_fan_write(hw_state_t *hw);
+int ctrl_fan_set_enabled(hw_state_t *hw, bool cpu_on, bool gpu_on);
+/* preset: 0 stock, 1 silent, 2 cool, 3 full (writes immediately) */
+int ctrl_fan_preset(hw_state_t *hw, int preset);
+
+#endif /* CTRON_CONTROL_H */

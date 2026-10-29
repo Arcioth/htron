@@ -10,11 +10,12 @@ use std::time::Duration;
 use gtk4::gdk::Display;
 use gtk4::prelude::*;
 use gtk4::{
-    Align, ApplicationWindow, Box as GtkBox, Button, CssProvider, DrawingArea, Label, Orientation,
-    Scale, Stack, StackTransitionType, STYLE_PROVIDER_PRIORITY_APPLICATION,
+    Align, Box as GtkBox, Button, CssProvider, DrawingArea, Label, MenuButton, Orientation,
+    Popover, Scale, Stack, StackTransitionType, STYLE_PROVIDER_PRIORITY_APPLICATION,
     STYLE_PROVIDER_PRIORITY_USER,
 };
 use libadwaita as adw;
+use libadwaita::prelude::*;
 
 use crate::audio::{format_mmss, AudioCmd, PlayState};
 use crate::ui::build_user_texture_css;
@@ -180,12 +181,13 @@ fn main() {
                 String::new()
             }
         )));
-        status_lbl.set_halign(Align::Start);
+        status_lbl.set_xalign(0.0);
         status_lbl.set_hexpand(true);
         status_lbl.set_width_chars(12);
         status_lbl.set_ellipsize(gtk4::pango::EllipsizeMode::End);
         let hw_ident_lbl = Label::new(Some(""));
-        hw_ident_lbl.set_halign(Align::End);
+        hw_ident_lbl.set_xalign(1.0);
+        hw_ident_lbl.set_max_width_chars(38);
         hw_ident_lbl.set_ellipsize(gtk4::pango::EllipsizeMode::End);
         status_strip.append(&status_lbl);
         status_strip.append(&hw_ident_lbl);
@@ -222,7 +224,6 @@ fn main() {
         let brand_s = Label::new(Some("CRYO-OPHIDIAN SUITE"));
         brand_s.add_css_class("brand-subtitle");
         brand_s.set_halign(Align::Start);
-        brand_s.set_ellipsize(gtk4::pango::EllipsizeMode::End);
         brand_box.append(&brand_t);
         brand_box.append(&brand_s);
 
@@ -248,23 +249,39 @@ fn main() {
         header.append(&pill_fan);
         header.append(&pill_bat);
 
+        // Quick ctron modes live in a compact popover so the header never
+        // forces the window wider than a half-screen Hyprland tile.
+        let mode_menu = MenuButton::new();
+        mode_menu.set_label("⚡ Mode");
+        mode_menu.add_css_class("cryo-menu");
+        mode_menu.set_tooltip_text(Some("Apply a ctron shortcut mode (~/.config/ctron/modes.ini)"));
+        let mode_pop = Popover::new();
+        mode_pop.add_css_class("cryo-popover");
+        let mode_pop_box = GtkBox::new(Orientation::Vertical, 6);
         for (label, mname) in [
-            ("silent", "silent"),
-            ("quiet", "quiet"),
-            ("bal", "balanced"),
-            ("perf", "performance"),
-            ("turbo", "turbo"),
+            ("🌙  Silent", "silent"),
+            ("🍃  Quiet", "quiet"),
+            ("⚖  Balanced", "balanced"),
+            ("🔥  Performance", "performance"),
+            ("⚡  Turbo", "turbo"),
         ] {
             let b = Button::with_label(label);
             b.add_css_class("cryo-btn");
             let scb = Rc::clone(&status_cb);
             let mn = mname.to_string();
-            b.connect_clicked(move |_| match ffi::apply_mode(&mn) {
-                Ok(()) => scb(&format!("Switched to mode [{}]", mn)),
-                Err(e) => scb(&format!("Mode [{}]: {}", mn, e)),
+            let pop = mode_pop.clone();
+            b.connect_clicked(move |_| {
+                pop.popdown();
+                match ffi::apply_mode(&mn) {
+                    Ok(()) => scb(&format!("Switched to mode [{}]", mn)),
+                    Err(e) => scb(&format!("Mode [{}]: {}", mn, e)),
+                }
             });
-            header.append(&b);
+            mode_pop_box.append(&b);
         }
+        mode_pop.set_child(Some(&mode_pop_box));
+        mode_menu.set_popover(Some(&mode_pop));
+        header.append(&mode_menu);
 
         // Live User Texture Pack Reload Button (~/.config/htron/textures/)
         let btn_reload_tex = Button::with_label("🎨");
@@ -301,7 +318,7 @@ fn main() {
 
         let rail = GtkBox::new(Orientation::Vertical, 4);
         rail.add_css_class("serpent-rail");
-        rail.set_size_request(185, -1);
+        rail.set_size_request(168, -1);
 
         let rail_lbl1 = Label::new(Some("SYSTEM & HARDWARE"));
         rail_lbl1.add_css_class("rail-section-label");
@@ -436,7 +453,7 @@ fn main() {
 
         let dock_track_lbl =
             Label::new(Some("♪ Tunotron Ready — Open Tunotron Deck to play ~/Music"));
-        dock_track_lbl.set_halign(Align::Start);
+        dock_track_lbl.set_xalign(0.0);
         dock_track_lbl.set_hexpand(true);
         dock_track_lbl.set_width_chars(10);
         dock_track_lbl.set_ellipsize(gtk4::pango::EllipsizeMode::End);
@@ -446,21 +463,23 @@ fn main() {
         dock_time_lbl.add_css_class("cryo-chip");
         dock.append(&dock_time_lbl);
 
-        let btn_loop = Button::with_label("Loop: All");
+        let btn_loop = Button::with_label("🔁 All");
         btn_loop.add_css_class("cryo-btn");
+        btn_loop.set_tooltip_text(Some("Cycle loop mode"));
         {
             let aud = Rc::clone(&audio);
             btn_loop.connect_clicked(move |_| aud.send(AudioCmd::CycleLoop));
         }
 
-        let btn_shuf = Button::with_label("Shuffle: Off");
+        let btn_shuf = Button::with_label("🔀 Off");
         btn_shuf.add_css_class("cryo-btn");
+        btn_shuf.set_tooltip_text(Some("Toggle shuffle"));
         {
             let aud = Rc::clone(&audio);
             btn_shuf.connect_clicked(move |_| aud.send(AudioCmd::ToggleShuffle));
         }
 
-        let vol_lbl = Label::new(Some("Vol:"));
+        let vol_lbl = Label::new(Some("🔊"));
         vol_lbl.add_css_class("dim-label");
         let vol_scale = Scale::with_range(Orientation::Horizontal, 0.0, 100.0, 5.0);
         vol_scale.set_value(100.0);
@@ -582,24 +601,35 @@ fn main() {
                     format_mmss(asnap.position_sec),
                     format_mmss(asnap.duration_sec)
                 ));
-                b_loop.set_label(&format!("Loop: {}", asnap.loop_mode.display_str()));
-                b_shuf.set_label(&format!(
-                    "Shuffle: {}",
-                    if asnap.shuffle { "On" } else { "Off" }
-                ));
+                b_loop.set_label(&format!("🔁 {}", asnap.loop_mode.display_str()));
+                b_shuf.set_label(if asnap.shuffle { "🔀 On" } else { "🔀 Off" });
 
                 gtk4::glib::ControlFlow::Continue
             });
         }
 
-        let window = ApplicationWindow::builder()
+        let window = adw::ApplicationWindow::builder()
             .application(app)
             .title("htron — Cryo-Ophidian Hardware & Audio Suite")
             .default_width(1100)
             .default_height(720)
-            .child(&root_vbox)
+            .width_request(720)
+            .height_request(480)
+            .content(&root_vbox)
             .build();
         window.add_css_class("htron-window");
+
+        // Narrow layout (half-screen tiles): stack side-by-side cards vertically.
+        let narrow = adw::Breakpoint::new(
+            adw::BreakpointCondition::parse("max-width: 1250px")
+                .expect("valid breakpoint condition"),
+        );
+        let vertical = Orientation::Vertical.to_value();
+        for b in ui::take_responsive_boxes() {
+            narrow.add_setter(&b, "orientation", Some(&vertical));
+        }
+        window.add_breakpoint(narrow);
+
         window.present();
     });
 

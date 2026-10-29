@@ -10,10 +10,50 @@ use std::path::{Path, PathBuf};
 use gtk4::cairo::Context;
 use gtk4::gdk_pixbuf::Pixbuf;
 use gtk4::prelude::*;
+use gtk4::{Align, Box as GtkBox, FlowBox, Orientation, SelectionMode};
 
 thread_local! {
     static CANVAS_ICE_PIXBUF: RefCell<Option<Pixbuf>> = const { RefCell::new(None) };
     static CANVAS_SURFACE_TRIED: RefCell<bool> = const { RefCell::new(false) };
+    static RESPONSIVE_BOXES: RefCell<Vec<GtkBox>> = const { RefCell::new(Vec::new()) };
+}
+
+/// A horizontal box that the main window flips to vertical on narrow widths
+/// (half-screen Hyprland tiles) via an `adw::Breakpoint`.
+pub fn responsive_box(spacing: i32) -> GtkBox {
+    let b = GtkBox::new(Orientation::Horizontal, spacing);
+    b.set_hexpand(true);
+    RESPONSIVE_BOXES.with(|r| r.borrow_mut().push(b.clone()));
+    b
+}
+
+/// Drains every box registered through [`responsive_box`].
+pub fn take_responsive_boxes() -> Vec<GtkBox> {
+    RESPONSIVE_BOXES.with(|r| std::mem::take(&mut *r.borrow_mut()))
+}
+
+/// A wrapping row for buttons/chips: children flow onto new lines instead of
+/// forcing the window wider than the screen.
+pub fn flow_row() -> FlowBox {
+    let f = FlowBox::new();
+    f.set_selection_mode(SelectionMode::None);
+    f.set_homogeneous(false);
+    f.set_min_children_per_line(1);
+    f.set_max_children_per_line(64);
+    f.set_column_spacing(6);
+    f.set_row_spacing(6);
+    f.set_valign(Align::Start);
+    f.set_hexpand(true);
+    f.add_css_class("btn-flow");
+    f
+}
+
+/// Appends a widget to a [`flow_row`] without adding an extra keyboard focus stop.
+pub fn flow_add(f: &FlowBox, w: &impl IsA<gtk4::Widget>) {
+    f.insert(w, -1);
+    if let Some(child) = w.as_ref().parent() {
+        child.set_focusable(false);
+    }
 }
 
 /// Returns the user texture pack directory (`~/.config/htron/textures`).
@@ -153,6 +193,24 @@ pub fn build_user_texture_css() -> (String, usize) {
              }}\n",
             ice.display()
         ));
+    }
+
+    // Active / selected states must win over the textured backgrounds above
+    // (this provider sits at USER priority, above style.css).
+    if count > 0 {
+        css.push_str(
+            "button.cryo-btn.cryo-btn-active, button.cryo-btn.cryo-btn-active:hover, button.cryo-btn:active {\n\
+               background-image: linear-gradient(135deg, #00f0ff 0%, #14b8a6 100%);\n\
+               border-color: #ccfffe;\n\
+               color: #03070c;\n\
+             }\n\
+             .track-row.track-row-playing {\n\
+               background-image: linear-gradient(90deg, rgba(0, 240, 255, 0.30) 0%, rgba(13, 52, 66, 0.92) 100%);\n\
+             }\n\
+             .sensor-pill.sensor-pill-hot {\n\
+               background-image: linear-gradient(180deg, rgba(120, 20, 45, 0.70) 0%, rgba(45, 12, 24, 0.85) 100%);\n\
+             }\n",
+        );
     }
 
     let user_dir = ensure_texture_pack_dir();

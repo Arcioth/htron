@@ -1,14 +1,15 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use gtk4::pango::EllipsizeMode;
 use gtk4::prelude::*;
 use gtk4::{
-    Align, Box as GtkBox, Button, DrawingArea, Entry, GestureClick, Label, Orientation, PolicyType,
+    Box as GtkBox, Button, DrawingArea, Entry, GestureClick, Label, Orientation, PolicyType,
     ScrolledWindow,
 };
 
 use crate::ffi;
-use crate::ui::draw_cryo_grid;
+use crate::ui::{draw_cryo_grid, flow_add, flow_row, responsive_box};
 
 #[derive(Clone)]
 pub struct DaeboardViewHandles {
@@ -59,7 +60,7 @@ fn build_keyboard_layout() -> Vec<KeyRect> {
         ("0", "key0", 1.0),
         ("-", "minus", 1.0),
         ("=", "equal", 1.0),
-        ("BACKSPACE", "backspace", 2.4),
+        ("BKSP", "backspace", 2.4),
     ];
     // Row 2: Tab + QWERTY
     let r2: &[(&str, &str, f64)] = &[
@@ -114,7 +115,7 @@ fn build_keyboard_layout() -> Vec<KeyRect> {
         ("CTRL", "leftctrl", 1.4),
         ("META", "leftmeta", 1.4),
         ("ALT", "leftalt", 1.4),
-        ("SPACEBAR", "space", 6.2),
+        ("SPACE", "space", 6.2),
         ("RALT", "rightalt", 1.3),
         ("RMETA", "rightmeta", 1.3),
         ("RCTRL", "rightctrl", 1.4),
@@ -151,11 +152,11 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
         .vexpand(true)
         .build();
 
-    let outer = GtkBox::new(Orientation::Vertical, 16);
-    outer.set_margin_top(16);
-    outer.set_margin_bottom(16);
-    outer.set_margin_start(18);
-    outer.set_margin_end(18);
+    let outer = GtkBox::new(Orientation::Vertical, 14);
+    outer.set_margin_top(14);
+    outer.set_margin_bottom(14);
+    outer.set_margin_start(14);
+    outer.set_margin_end(14);
 
     let selected_key_idx = Rc::new(RefCell::new(0usize));
     let active_color_rgb = Rc::new(RefCell::new((0.80f64, 1.0f64, 0.99f64))); // #ccfffe default
@@ -166,24 +167,28 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
     let ctrl_card = GtkBox::new(Orientation::Vertical, 10);
     ctrl_card.add_css_class("serpent-card");
 
-    let hdr_row = GtkBox::new(Orientation::Horizontal, 10);
-    let title_vb = GtkBox::new(Orientation::Vertical, 2);
     let title = Label::new(Some(
         "◆ DAEBOARD KEYBOARD LED DAEMON & WRITER ARBITRATION",
     ));
     title.add_css_class("card-title");
-    title.set_halign(Align::Start);
-    title.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    title.set_xalign(0.0);
+    title.set_hexpand(true);
+    title.set_width_chars(12);
+    title.set_ellipsize(EllipsizeMode::End);
+
     let sub = Label::new(Some(
         "Socket: /run/daeboard/daeboard.sock (SOCK_SEQPACKET) · Binds: ~/.config/ctron/daeboard.binds",
     ));
     sub.add_css_class("card-subtitle");
-    sub.set_halign(Align::Start);
-    sub.set_ellipsize(gtk4::pango::EllipsizeMode::End);
-    title_vb.append(&title);
-    title_vb.append(&sub);
-    title_vb.set_hexpand(true);
+    sub.set_xalign(0.0);
+    sub.set_hexpand(true);
+    sub.set_width_chars(12);
+    sub.set_ellipsize(EllipsizeMode::End);
 
+    ctrl_card.append(&title);
+    ctrl_card.append(&sub);
+
+    let daemon_row = flow_row();
     let daemon_badge = Label::new(Some(if ffi::db_is_up() {
         "● ONLINE"
     } else {
@@ -191,28 +196,27 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
     }));
     daemon_badge.add_css_class("cryo-chip");
 
-    let btn_start = Button::with_label("▶ Start");
+    let btn_start = Button::with_label("▶ Start Daemon");
     btn_start.add_css_class("cryo-btn");
     let btn_stop = Button::with_label("■ Stop");
     btn_stop.add_css_class("ember-btn");
-    let btn_reload = Button::with_label("↻ Reload");
+    let btn_reload = Button::with_label("↻ Reload Binds");
     btn_reload.add_css_class("cryo-btn");
 
-    hdr_row.append(&title_vb);
-    hdr_row.append(&daemon_badge);
-    hdr_row.append(&btn_start);
-    hdr_row.append(&btn_stop);
-    hdr_row.append(&btn_reload);
-    ctrl_card.append(&hdr_row);
+    flow_add(&daemon_row, &daemon_badge);
+    flow_add(&daemon_row, &btn_start);
+    flow_add(&daemon_row, &btn_stop);
+    flow_add(&daemon_row, &btn_reload);
+    ctrl_card.append(&daemon_row);
 
-    // Row 1A: Static Color Swatches
-    let light_row = GtkBox::new(Orientation::Horizontal, 6);
+    // Row 1A: Static Color Swatches (wrapping FlowBox)
+    let light_row = flow_row();
     let col_lbl = Label::new(Some("Resting Color:"));
     col_lbl.add_css_class("dim-label");
-    light_row.append(&col_lbl);
+    flow_add(&light_row, &col_lbl);
 
     let kbd_canvas = DrawingArea::builder()
-        .content_width(420)
+        .content_width(280)
         .content_height(195)
         .hexpand(true)
         .build();
@@ -247,15 +251,15 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
             }
             canvas_c.queue_draw();
         });
-        light_row.append(&b);
+        flow_add(&light_row, &b);
     }
     ctrl_card.append(&light_row);
 
     // Row 1B: Keyboard Brightness
-    let bright_row = GtkBox::new(Orientation::Horizontal, 6);
-    let br_lbl = Label::new(Some("Keyboard Brightness:"));
+    let bright_row = flow_row();
+    let br_lbl = Label::new(Some("Brightness:"));
     br_lbl.add_css_class("dim-label");
-    bright_row.append(&br_lbl);
+    flow_add(&bright_row, &br_lbl);
 
     for (bname, lvl) in [("Off (0)", 0), ("Low (1)", 1), ("Med (2)", 2), ("High (3)", 3)] {
         let b = Button::with_label(bname);
@@ -271,7 +275,7 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
                 scb(&format!("Keyboard brightness set to {}", bname));
             }
         });
-        bright_row.append(&b);
+        flow_add(&bright_row, &b);
     }
 
     ctrl_card.append(&bright_row);
@@ -286,7 +290,10 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
         "◆ INTERACTIVE ASUS TUF KEYBOARD DECK (CLICK ANY KEY TO INSPECT OR BIND)",
     ));
     deck_title.add_css_class("card-title");
-    deck_title.set_halign(Align::Start);
+    deck_title.set_xalign(0.0);
+    deck_title.set_hexpand(true);
+    deck_title.set_width_chars(12);
+    deck_title.set_ellipsize(EllipsizeMode::End);
     deck_card.append(&deck_title);
 
     let layout = Rc::new(build_keyboard_layout());
@@ -307,15 +314,16 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
                 .unwrap_or("");
             let (ar, ag, ab) = *rgb_ref.borrow();
 
-            let pad = 12.0;
+            let pad = 10.0;
             let kw = (wf - pad * 2.0).max(20.0);
             let kh = (hf - pad * 2.0).max(20.0);
+            let font_sz = (wf / 68.0).clamp(7.5, 10.5);
 
             for kr in lay.iter() {
-                let x = pad + kr.x * kw + 2.0;
-                let y = pad + kr.y * kh + 2.0;
-                let bw = (kr.w * kw - 4.0).max(4.0);
-                let bh = (kr.h * kh - 4.0).max(4.0);
+                let x = pad + kr.x * kw + 1.5;
+                let y = pad + kr.y * kh + 1.5;
+                let bw = (kr.w * kw - 3.0).max(4.0);
+                let bh = (kr.h * kh - 3.0).max(4.0);
 
                 let is_bound = binds
                     .iter()
@@ -334,23 +342,23 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
 
                 if is_selected {
                     cr.set_source_rgba(0.0, 0.94, 1.0, 1.0);
-                    cr.set_line_width(2.2);
+                    cr.set_line_width(2.0);
                 } else if is_bound {
                     cr.set_source_rgba(0.65, 0.55, 0.98, 0.92);
-                    cr.set_line_width(1.6);
+                    cr.set_line_width(1.5);
                 } else {
                     cr.set_source_rgba(ar, ag, ab, 0.35);
                     cr.set_line_width(1.0);
                 }
                 let _ = cr.stroke();
 
-                cr.set_font_size(10.0);
+                cr.set_font_size(font_sz);
                 if is_selected || is_bound {
                     cr.set_source_rgba(0.92, 1.0, 1.0, 0.98);
                 } else {
                     cr.set_source_rgba(ar, ag, ab, 0.85);
                 }
-                cr.move_to(x + 6.0, y + bh * 0.62);
+                cr.move_to(x + 4.0, y + bh * 0.62);
                 let _ = cr.show_text(kr.label);
             }
         });
@@ -362,55 +370,60 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
     // =====================================================================
     // CARD 3: MACRO TIMELINE STUDIO (~/.config/ctron/daeboard.binds)
     // =====================================================================
-    let studio_card = GtkBox::new(Orientation::Vertical, 12);
+    let studio_card = GtkBox::new(Orientation::Vertical, 10);
     studio_card.add_css_class("serpent-card");
 
     let st_hdr = GtkBox::new(Orientation::Horizontal, 8);
     let st_title = Label::new(Some("◆ MACRO TIMELINE STUDIO (DOWN / UP EDGES)"));
     st_title.add_css_class("card-title");
-    st_title.set_halign(Align::Start);
+    st_title.set_xalign(0.0);
     st_title.set_hexpand(true);
-    st_title.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    st_title.set_width_chars(10);
+    st_title.set_ellipsize(EllipsizeMode::End);
 
-    let new_key_entry = Entry::builder()
-        .placeholder_text("key (e.g. f6, space)")
-        .width_chars(14)
-        .build();
-    let btn_add_key = Button::with_label("+ Bind Key");
-    btn_add_key.add_css_class("cryo-btn");
     let btn_save_binds = Button::with_label("💾 SAVE BINDS");
     btn_save_binds.add_css_class("fang-action-btn");
 
     st_hdr.append(&st_title);
-    st_hdr.append(&new_key_entry);
-    st_hdr.append(&btn_add_key);
     st_hdr.append(&btn_save_binds);
     studio_card.append(&st_hdr);
 
-    let key_tabs_row = GtkBox::new(Orientation::Horizontal, 6);
+    let bind_add_row = GtkBox::new(Orientation::Horizontal, 8);
+    let new_key_entry = Entry::builder()
+        .placeholder_text("Bind new key (e.g. f6, space, capslock)")
+        .width_chars(12)
+        .hexpand(true)
+        .build();
+    let btn_add_key = Button::with_label("+ Bind Key");
+    btn_add_key.add_css_class("cryo-btn");
+    bind_add_row.append(&new_key_entry);
+    bind_add_row.append(&btn_add_key);
+    studio_card.append(&bind_add_row);
+
+    let key_tabs_row = flow_row();
     studio_card.append(&key_tabs_row);
 
     let down_box = GtkBox::new(Orientation::Vertical, 6);
     down_box.add_css_class("frost-panel");
+    down_box.set_hexpand(true);
     let up_box = GtkBox::new(Orientation::Vertical, 6);
     up_box.add_css_class("frost-panel");
-
-    let edges_row = GtkBox::new(Orientation::Horizontal, 12);
-    down_box.set_hexpand(true);
     up_box.set_hexpand(true);
+
+    let edges_row = responsive_box(12);
     edges_row.append(&down_box);
     edges_row.append(&up_box);
     studio_card.append(&edges_row);
 
-    // Split step builder into 2 clean rows so it never overflows horizontally
     let step_builder_row = GtkBox::new(Orientation::Horizontal, 8);
     let step_entry = Entry::builder()
         .placeholder_text("step (e.g. color 00f0ff 150, breathe 0, fade 2000, rest)")
+        .width_chars(12)
         .hexpand(true)
         .build();
-    let btn_add_down = Button::with_label("+ Add to DOWN");
+    let btn_add_down = Button::with_label("+ DOWN");
     btn_add_down.add_css_class("cryo-btn");
-    let btn_add_up = Button::with_label("+ Add to UP");
+    let btn_add_up = Button::with_label("+ UP");
     btn_add_up.add_css_class("cryo-btn");
 
     step_builder_row.append(&step_entry);
@@ -418,10 +431,10 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
     step_builder_row.append(&btn_add_up);
     studio_card.append(&step_builder_row);
 
-    let step_presets_row = GtkBox::new(Orientation::Horizontal, 6);
-    let presets_lbl = Label::new(Some("Step Presets:"));
+    let step_presets_row = flow_row();
+    let presets_lbl = Label::new(Some("Presets:"));
     presets_lbl.add_css_class("dim-label");
-    step_presets_row.append(&presets_lbl);
+    flow_add(&step_presets_row, &presets_lbl);
 
     for preset_step in [
         "color 00f0ff 160",
@@ -439,20 +452,23 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
         b.connect_clicked(move |_| {
             se.set_text(&ps);
         });
-        step_presets_row.append(&b);
+        flow_add(&step_presets_row, &b);
     }
     studio_card.append(&step_presets_row);
 
-    let ctron_row = GtkBox::new(Orientation::Horizontal, 8);
     let ctron_lbl = Label::new(Some("Follower ctron command on key press:"));
     ctron_lbl.add_css_class("dim-label");
+    ctron_lbl.set_xalign(0.0);
+    studio_card.append(&ctron_lbl);
+
+    let ctron_row = GtkBox::new(Orientation::Horizontal, 8);
     let ctron_entry = Entry::builder()
         .placeholder_text("e.g. profile performance  or  mode turbo")
+        .width_chars(12)
         .hexpand(true)
         .build();
     let btn_set_ctron = Button::with_label("Set Key Action");
     btn_set_ctron.add_css_class("cryo-btn");
-    ctron_row.append(&ctron_lbl);
     ctron_row.append(&ctron_entry);
     ctron_row.append(&btn_set_ctron);
     studio_card.append(&ctron_row);
@@ -506,7 +522,7 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
                         f();
                     }
                 });
-                kt_row.append(&b);
+                flow_add(&kt_row, &b);
             }
 
             // Delete current key button
@@ -520,7 +536,7 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
                         f();
                     }
                 });
-                kt_row.append(&b_del_key);
+                flow_add(&kt_row, &b_del_key);
             }
 
             let active = &list[cur];
@@ -532,15 +548,20 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
                 active.down_steps.len()
             )));
             d_hdr.add_css_class("card-title");
-            d_hdr.set_halign(Align::Start);
+            d_hdr.set_xalign(0.0);
+            d_hdr.set_hexpand(true);
+            d_hdr.set_width_chars(10);
+            d_hdr.set_ellipsize(EllipsizeMode::End);
             d_box.append(&d_hdr);
 
             for (si, step) in active.down_steps.iter().enumerate() {
                 let r = GtkBox::new(Orientation::Horizontal, 6);
                 let l = Label::new(Some(&format!("{}.  {}", si + 1, step)));
                 l.add_css_class("cryo-chip");
-                l.set_halign(Align::Start);
+                l.set_xalign(0.0);
                 l.set_hexpand(true);
+                l.set_width_chars(8);
+                l.set_ellipsize(EllipsizeMode::End);
                 let b_rm = Button::with_label("✕");
                 b_rm.add_css_class("cryo-btn");
                 let sr = Rc::clone(&self_ref);
@@ -561,15 +582,20 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
                 active.up_steps.len()
             )));
             u_hdr.add_css_class("card-title");
-            u_hdr.set_halign(Align::Start);
+            u_hdr.set_xalign(0.0);
+            u_hdr.set_hexpand(true);
+            u_hdr.set_width_chars(10);
+            u_hdr.set_ellipsize(EllipsizeMode::End);
             u_box.append(&u_hdr);
 
             for (si, step) in active.up_steps.iter().enumerate() {
                 let r = GtkBox::new(Orientation::Horizontal, 6);
                 let l = Label::new(Some(&format!("{}.  {}", si + 1, step)));
                 l.add_css_class("venom-chip");
-                l.set_halign(Align::Start);
+                l.set_xalign(0.0);
                 l.set_hexpand(true);
+                l.set_width_chars(8);
+                l.set_ellipsize(EllipsizeMode::End);
                 let b_rm = Button::with_label("✕");
                 b_rm.add_css_class("cryo-btn");
                 let sr = Rc::clone(&self_ref);
@@ -601,19 +627,22 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
         click.connect_pressed(move |_, _, x, y| {
             let wf = canvas_c.width() as f64;
             let hf = canvas_c.height() as f64;
-            let pad = 12.0;
+            let pad = 10.0;
             let kw = (wf - pad * 2.0).max(20.0);
             let kh = (hf - pad * 2.0).max(20.0);
 
             for kr in lay.iter() {
-                let kx = pad + kr.x * kw + 2.0;
-                let ky = pad + kr.y * kh + 2.0;
-                let bw = (kr.w * kw - 4.0).max(4.0);
-                let bh = (kr.h * kh - 4.0).max(4.0);
+                let kx = pad + kr.x * kw + 1.5;
+                let ky = pad + kr.y * kh + 1.5;
+                let bw = (kr.w * kw - 3.0).max(4.0);
+                let bh = (kr.h * kh - 3.0).max(4.0);
                 if x >= kx && x <= kx + bw && y >= ky && y <= ky + bh {
                     if let Some(idx) = ffi::binds_add_key(kr.bind_name) {
                         *sel.borrow_mut() = idx;
-                        scb(&format!("Selected key [{}] in Daeboard Macro Studio", kr.bind_name));
+                        scb(&format!(
+                            "Selected key [{}] in Daeboard Macro Studio",
+                            kr.bind_name
+                        ));
                         reb();
                     }
                     break;
@@ -681,14 +710,12 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
     {
         let scb = Rc::clone(&status_cb);
         let badge = daemon_badge.clone();
-        btn_save_binds.connect_clicked(move |_| {
-            match ffi::binds_save_and_reload() {
-                Ok(()) => {
-                    badge.set_text("● DAEBOARD ONLINE (pong)");
-                    scb("Saved ~/.config/ctron/daeboard.binds & hot-reloaded daeboard daemon");
-                }
-                Err(e) => scb(&format!("Saved binds file; daemon reload note: {}", e)),
+        btn_save_binds.connect_clicked(move |_| match ffi::binds_save_and_reload() {
+            Ok(()) => {
+                badge.set_text("● ONLINE");
+                scb("Saved ~/.config/ctron/daeboard.binds & hot-reloaded daeboard daemon");
             }
+            Err(e) => scb(&format!("Saved binds file; daemon reload note: {}", e)),
         });
     }
 
@@ -697,7 +724,7 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
         let badge = daemon_badge.clone();
         btn_start.connect_clicked(move |_| {
             if ffi::db_start_daemon() || ffi::db_is_up() {
-                badge.set_text("● DAEBOARD ONLINE (pong)");
+                badge.set_text("● ONLINE");
                 scb("Started daeboard root LED daemon via systemd-run");
             } else {
                 scb("Could not start daeboard daemon (check passwordless sudo systemd-run)");
@@ -710,7 +737,7 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
         let badge = daemon_badge.clone();
         btn_stop.connect_clicked(move |_| {
             if ffi::db_stop_daemon() {
-                badge.set_text("○ DAEBOARD STOPPED");
+                badge.set_text("○ STOPPED");
                 scb("Stopped daeboard daemon (restored static keyboard color)");
             } else {
                 scb("daeboard daemon is already stopped");
@@ -729,9 +756,9 @@ pub fn build_daeboard_view(status_cb: Rc<dyn Fn(&str)>) -> DaeboardViewHandles {
     let badge_ref = daemon_badge.clone();
     let refresh_ui: Rc<dyn Fn(&ffi::HwSnapshot)> = Rc::new(move |snap: &ffi::HwSnapshot| {
         if snap.raw.daeboard_up != 0 {
-            badge_ref.set_text("● DAEBOARD ONLINE (pong)");
+            badge_ref.set_text("● ONLINE");
         } else {
-            badge_ref.set_text("○ DAEBOARD STOPPED");
+            badge_ref.set_text("○ STOPPED");
         }
     });
 

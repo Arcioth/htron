@@ -3,12 +3,12 @@ use std::rc::Rc;
 
 use gtk4::prelude::*;
 use gtk4::{
-    Align, Box as GtkBox, Button, DrawingArea, Entry, GestureClick, GestureDrag, Grid, Label,
+    Align, Box as GtkBox, Button, DrawingArea, Entry, GestureClick, GestureDrag, Label,
     Orientation, ScrolledWindow, Scale, PolicyType,
 };
 
 use crate::ffi;
-use crate::ui::{draw_cryo_grid, draw_diamond_node};
+use crate::ui::{draw_cryo_grid, draw_diamond_node, flow_add, flow_row, responsive_box};
 
 #[derive(Clone)]
 pub struct CtronViewHandles {
@@ -70,8 +70,7 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
     // =====================================================================
     // ROW 1: CRYO-OPHIDIAN 8-POINT DUAL FAN CURVE STUDIO + QUICK MODES
     // =====================================================================
-    let top_row = GtkBox::new(Orientation::Horizontal, 16);
-    top_row.set_hexpand(true);
+    let top_row = responsive_box(16);
 
     let fan_card = GtkBox::new(Orientation::Vertical, 10);
     fan_card.add_css_class("serpent-card");
@@ -81,7 +80,7 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
     let fan_title_box = GtkBox::new(Orientation::Vertical, 2);
     let fan_title = Label::new(Some("◆ CRYO-OPHIDIAN DUAL 8-POINT FAN CURVE STUDIO"));
     fan_title.add_css_class("card-title");
-    fan_title.set_halign(Align::Start);
+    fan_title.set_xalign(0.0);
     fan_title.set_hexpand(true);
     fan_title.set_width_chars(10);
     fan_title.set_ellipsize(gtk4::pango::EllipsizeMode::End);
@@ -89,7 +88,7 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
         "Drag diamond nodes to stage temperature/PWM curves · Verified EC commit",
     ));
     fan_sub.add_css_class("card-subtitle");
-    fan_sub.set_halign(Align::Start);
+    fan_sub.set_xalign(0.0);
     fan_sub.set_hexpand(true);
     fan_sub.set_width_chars(10);
     fan_sub.set_ellipsize(gtk4::pango::EllipsizeMode::End);
@@ -125,6 +124,7 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
         .content_width(340)
         .content_height(260)
         .hexpand(true)
+        .vexpand(true)
         .build();
 
     let ed_draw = Rc::clone(&editor_state);
@@ -370,10 +370,10 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
     fan_card.append(&fan_canvas);
 
     // Fan Preset & Write Action Bar (Split into 2 compact rows so it never forces wide min-width)
-    let fan_bar = GtkBox::new(Orientation::Horizontal, 6);
+    let fan_bar = flow_row();
     let lbl_presets = Label::new(Some("Presets:"));
     lbl_presets.add_css_class("dim-label");
-    fan_bar.append(&lbl_presets);
+    flow_add(&fan_bar, &lbl_presets);
 
     for (label, idx) in [
         ("Quiet", 0),
@@ -394,7 +394,7 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
                 canvas_p.queue_draw();
             }
         });
-        fan_bar.append(&b);
+        flow_add(&fan_bar, &b);
     }
 
     for (label, q_idx) in [("Stock", 0), ("Silent", 1), ("Cool", 2), ("FullSpeed", 3)] {
@@ -410,7 +410,7 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
             }
             canvas_q.queue_draw();
         });
-        fan_bar.append(&b);
+        flow_add(&fan_bar, &b);
     }
     fan_card.append(&fan_bar);
 
@@ -470,11 +470,15 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
 
     let m_title = Label::new(Some("◆ MODES & SNAPSHOTS"));
     m_title.add_css_class("card-title");
-    m_title.set_halign(Align::Start);
+    m_title.set_xalign(0.0);
+    m_title.set_hexpand(true);
+    m_title.set_width_chars(8);
     m_title.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     let m_sub = Label::new(Some("~/.config/ctron/modes.ini & profiles/*.ctr"));
     m_sub.add_css_class("card-subtitle");
-    m_sub.set_halign(Align::Start);
+    m_sub.set_xalign(0.0);
+    m_sub.set_hexpand(true);
+    m_sub.set_width_chars(8);
     m_sub.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     modes_card.append(&m_title);
     modes_card.append(&m_sub);
@@ -517,11 +521,14 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
                 let info = GtkBox::new(Orientation::Vertical, 2);
                 info.set_hexpand(true);
                 let nm = Label::new(Some(&format!("⚡ {}", mode.name.to_uppercase())));
-                nm.set_halign(Align::Start);
+                nm.set_xalign(0.0);
+                nm.set_hexpand(true);
                 nm.add_css_class("card-title");
+                nm.set_width_chars(8);
                 nm.set_ellipsize(gtk4::pango::EllipsizeMode::End);
                 let st = Label::new(Some(&mode.steps));
-                st.set_halign(Align::Start);
+                st.set_xalign(0.0);
+                st.set_hexpand(true);
                 st.add_css_class("dim-label");
                 st.set_width_chars(8);
                 st.set_ellipsize(gtk4::pango::EllipsizeMode::End);
@@ -562,10 +569,17 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
                     let vb = GtkBox::new(Orientation::Vertical, 1);
                     vb.set_hexpand(true);
                     let l1 = Label::new(Some(&format!("{} ({})", p.name, p.diff)));
-                    l1.set_halign(Align::Start);
+                    l1.set_xalign(0.0);
+                    l1.set_hexpand(true);
+                    l1.set_width_chars(8);
+                    l1.set_ellipsize(gtk4::pango::EllipsizeMode::End);
                     let l2 = Label::new(Some(&p.summary));
                     l2.add_css_class("dim-label");
-                    l2.set_halign(Align::Start);
+                    l2.set_xalign(0.0);
+                    l2.set_hexpand(true);
+                    l2.set_width_chars(8);
+                    l2.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+                    l2.set_tooltip_text(Some(&p.summary));
                     vb.append(&l1);
                     vb.append(&l2);
 
@@ -614,11 +628,7 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
     // =====================================================================
     // ROW 2: POWER / PPT / CPU / GPU / DISPLAY / BATTERY CONTROL MATRIX
     // =====================================================================
-    let bottom_grid = Grid::builder()
-        .column_spacing(16)
-        .row_spacing(16)
-        .hexpand(true)
-        .build();
+    let mid_row = responsive_box(16);
 
     // --- Card A: Platform Profile, EPP & CPU Ceiling ---
     let cpu_card = GtkBox::new(Orientation::Vertical, 10);
@@ -627,13 +637,16 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
 
     let cpu_hdr = Label::new(Some("◆ PLATFORM PROFILE, EPP & CPU FREQUENCY"));
     cpu_hdr.add_css_class("card-title");
-    cpu_hdr.set_halign(Align::Start);
+    cpu_hdr.set_xalign(0.0);
+    cpu_hdr.set_hexpand(true);
+    cpu_hdr.set_width_chars(10);
+    cpu_hdr.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     cpu_card.append(&cpu_hdr);
 
-    let prof_row = GtkBox::new(Orientation::Horizontal, 8);
+    let prof_row = flow_row();
     let prof_lbl = Label::new(Some("Platform Profile:"));
     prof_lbl.add_css_class("dim-label");
-    prof_row.append(&prof_lbl);
+    flow_add(&prof_row, &prof_lbl);
 
     let mut prof_btns = Vec::new();
     for (name, idx) in [("Quiet", 0), ("Balanced", 1), ("Performance", 2)] {
@@ -647,15 +660,15 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
                 scb(&format!("Failed to set platform profile {}", name));
             }
         });
-        prof_row.append(&b);
+        flow_add(&prof_row, &b);
         prof_btns.push((idx, b));
     }
     cpu_card.append(&prof_row);
 
-    let epp_row = GtkBox::new(Orientation::Horizontal, 6);
+    let epp_row = flow_row();
     let epp_lbl = Label::new(Some("EPP Governor:"));
     epp_lbl.add_css_class("dim-label");
-    epp_row.append(&epp_lbl);
+    flow_add(&epp_row, &epp_lbl);
     let mut epp_btns = Vec::new();
     for (name, idx) in [
         ("power", 0),
@@ -673,7 +686,7 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
                 scb(&format!("Failed to set EPP {}", name));
             }
         });
-        epp_row.append(&b);
+        flow_add(&epp_row, &b);
         epp_btns.push((idx, b));
     }
     cpu_card.append(&epp_row);
@@ -688,10 +701,17 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
         "CPU Ceiling: {} MHz",
         init_snap.raw.cpu_mhz_limit
     )));
-    freq_lbl.set_halign(Align::Start);
+    freq_lbl.set_xalign(0.0);
+    freq_lbl.set_hexpand(true);
+    freq_lbl.set_width_chars(10);
+    freq_lbl.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     let freq_scale = Scale::with_range(Orientation::Horizontal, min_hw_mhz, max_hw_mhz, 50.0);
     freq_scale.set_value(init_snap.raw.cpu_mhz_limit.max(2000) as f64);
     freq_scale.set_hexpand(true);
+    freq_scale.set_size_request(140, -1);
+    freq_scale.set_draw_value(true);
+    freq_scale.set_value_pos(gtk4::PositionType::Right);
+    freq_scale.set_digits(0);
 
     let btn_apply_freq = Button::with_label("Set MHz");
     btn_apply_freq.add_css_class("cryo-btn");
@@ -731,7 +751,7 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
         });
     }
 
-    freq_row.append(&freq_lbl);
+    cpu_card.append(&freq_lbl);
     freq_row.append(&freq_scale);
     freq_row.append(&btn_apply_freq);
     freq_row.append(&btn_cpu_boost);
@@ -745,12 +765,13 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
     let ppt_hdr = Label::new(Some("◆ PPT WATTAGE (SPL / SPPT / FPPT) & NVIDIA dGPU"));
     ppt_hdr.add_css_class("card-title");
     ppt_hdr.set_halign(Align::Start);
+    ppt_hdr.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     ppt_card.append(&ppt_hdr);
 
-    let ppt_preset_row = GtkBox::new(Orientation::Horizontal, 6);
+    let ppt_preset_row = flow_row();
     let ppt_p_lbl = Label::new(Some("PPT Quick:"));
     ppt_p_lbl.add_css_class("dim-label");
-    ppt_preset_row.append(&ppt_p_lbl);
+    flow_add(&ppt_preset_row, &ppt_p_lbl);
 
     for token in ["Q45", "B60", "P80", "off", "on"] {
         let b = Button::with_label(token);
@@ -761,7 +782,7 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
             Ok(()) => scb(&format!("Applied PPT preset '{}'", tok)),
             Err(e) => scb(&format!("PPT '{}': {}", tok, e)),
         });
-        ppt_preset_row.append(&b);
+        flow_add(&ppt_preset_row, &b);
     }
     ppt_card.append(&ppt_preset_row);
 
@@ -789,9 +810,6 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
     });
     fppt_scale.set_hexpand(true);
 
-    let ppt_sliders_row = GtkBox::new(Orientation::Horizontal, 8);
-    let lbl_spl = Label::new(Some("SPL/SPPT/FPPT:"));
-    lbl_spl.add_css_class("dim-label");
     let btn_apply_ppt = Button::with_label("Write PPT");
     btn_apply_ppt.add_css_class("cryo-btn");
     {
@@ -812,12 +830,27 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
             }
         });
     }
-    ppt_sliders_row.append(&lbl_spl);
-    ppt_sliders_row.append(&spl_scale);
-    ppt_sliders_row.append(&sppt_scale);
-    ppt_sliders_row.append(&fppt_scale);
-    ppt_sliders_row.append(&btn_apply_ppt);
-    ppt_card.append(&ppt_sliders_row);
+    // One labelled slider per limit (sustained / slow / fast) with live watt readout
+    for (name, sc) in [
+        ("SPL", &spl_scale),
+        ("SPPT", &sppt_scale),
+        ("FPPT", &fppt_scale),
+    ] {
+        let r = GtkBox::new(Orientation::Horizontal, 8);
+        let l = Label::new(Some(name));
+        l.add_css_class("dim-label");
+        l.set_width_chars(5);
+        l.set_xalign(0.0);
+        sc.set_draw_value(true);
+        sc.set_value_pos(gtk4::PositionType::Right);
+        sc.set_digits(0);
+        sc.set_size_request(140, -1);
+        r.append(&l);
+        r.append(sc);
+        ppt_card.append(&r);
+    }
+    btn_apply_ppt.set_halign(Align::End);
+    ppt_card.append(&btn_apply_ppt);
 
     // NVIDIA GPU Clock Lock & Dynamic Boost
     let nv_row = GtkBox::new(Orientation::Horizontal, 8);
@@ -827,6 +860,10 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
     let nv_clock_scale = Scale::with_range(Orientation::Horizontal, 600.0, gpu_max_clock, 15.0);
     nv_clock_scale.set_value(1800.0);
     nv_clock_scale.set_hexpand(true);
+    nv_clock_scale.set_size_request(140, -1);
+    nv_clock_scale.set_draw_value(true);
+    nv_clock_scale.set_value_pos(gtk4::PositionType::Right);
+    nv_clock_scale.set_digits(0);
 
     let btn_lock_gpu = Button::with_label("Lock MHz");
     btn_lock_gpu.add_css_class("cryo-btn");
@@ -853,7 +890,8 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
             }
         });
     }
-    nv_row.append(&nv_lbl);
+    nv_lbl.set_halign(Align::Start);
+    ppt_card.append(&nv_lbl);
     nv_row.append(&nv_clock_scale);
     nv_row.append(&btn_lock_gpu);
     nv_row.append(&btn_reset_gpu);
@@ -867,12 +905,13 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
     let disp_hdr = Label::new(Some("◆ HYPRLAND DISPLAY REFRESH & BATTERY HEALTH"));
     disp_hdr.add_css_class("card-title");
     disp_hdr.set_halign(Align::Start);
+    disp_hdr.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     disp_card.append(&disp_hdr);
 
-    let hz_row = GtkBox::new(Orientation::Horizontal, 8);
+    let hz_row = flow_row();
     let hz_lbl = Label::new(Some(&format!("Refresh Rate ({} Hz):", init_snap.raw.hz_cur)));
     hz_lbl.add_css_class("dim-label");
-    hz_row.append(&hz_lbl);
+    flow_add(&hz_row, &hz_lbl);
 
     let modes_hz = {
         let m = init_snap.supported_hz();
@@ -893,7 +932,7 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
                 scb(&format!("Failed to switch display to {} Hz", hz));
             }
         });
-        hz_row.append(&b);
+        flow_add(&hz_row, &b);
     }
 
     let btn_od = Button::with_label(if init_snap.raw.panel_od != 0 {
@@ -922,7 +961,7 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
             }
         });
     }
-    hz_row.append(&btn_od);
+    flow_add(&hz_row, &btn_od);
     disp_card.append(&hz_row);
 
     // Battery Charge Limit
@@ -932,9 +971,15 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
         init_snap.raw.bat_limit.max(80)
     )));
     bat_lbl.add_css_class("dim-label");
+    bat_lbl.set_halign(Align::Start);
+    bat_lbl.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     let bat_scale = Scale::with_range(Orientation::Horizontal, 20.0, 100.0, 5.0);
     bat_scale.set_value(init_snap.raw.bat_limit.max(80) as f64);
     bat_scale.set_hexpand(true);
+    bat_scale.set_size_request(140, -1);
+    bat_scale.set_draw_value(true);
+    bat_scale.set_value_pos(gtk4::PositionType::Right);
+    bat_scale.set_digits(0);
 
     let btn_set_bat = Button::with_label("Set Limit");
     btn_set_bat.add_css_class("cryo-btn");
@@ -964,17 +1009,16 @@ pub fn build_ctron_view(status_cb: Rc<dyn Fn(&str)>) -> CtronViewHandles {
         });
     }
 
-    bat_row.append(&bat_lbl);
+    disp_card.append(&bat_lbl);
     bat_row.append(&bat_scale);
     bat_row.append(&btn_set_bat);
     bat_row.append(&btn_oneshot);
     disp_card.append(&bat_row);
 
-    bottom_grid.attach(&cpu_card, 0, 0, 1, 1);
-    bottom_grid.attach(&ppt_card, 1, 0, 1, 1);
-    bottom_grid.attach(&disp_card, 0, 1, 2, 1);
-
-    outer.append(&bottom_grid);
+    mid_row.append(&cpu_card);
+    mid_row.append(&ppt_card);
+    outer.append(&mid_row);
+    outer.append(&disp_card);
     scroll.set_child(Some(&outer));
 
     let canvas_refresh = fan_canvas.clone();

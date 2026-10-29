@@ -1,12 +1,11 @@
 use std::rc::Rc;
 
+use gtk4::pango::EllipsizeMode;
 use gtk4::prelude::*;
-use gtk4::{
-    Align, Box as GtkBox, DrawingArea, Grid, Label, Orientation, PolicyType, ScrolledWindow,
-};
+use gtk4::{Box as GtkBox, DrawingArea, Label, Orientation, PolicyType, ScrolledWindow};
 
 use crate::ffi;
-use crate::ui::draw_cryo_grid;
+use crate::ui::{draw_cryo_grid, responsive_box};
 
 #[derive(Clone)]
 pub struct TelemViewHandles {
@@ -88,31 +87,32 @@ pub fn build_telem_view() -> TelemViewHandles {
         .vexpand(true)
         .build();
 
-    let outer = GtkBox::new(Orientation::Vertical, 16);
-    outer.set_margin_top(16);
-    outer.set_margin_bottom(16);
-    outer.set_margin_start(18);
-    outer.set_margin_end(18);
+    let outer = GtkBox::new(Orientation::Vertical, 14);
+    outer.set_margin_top(14);
+    outer.set_margin_bottom(14);
+    outer.set_margin_start(14);
+    outer.set_margin_end(14);
 
-    let banner = GtkBox::new(Orientation::Horizontal, 12);
+    let banner = GtkBox::new(Orientation::Vertical, 4);
     banner.add_css_class("serpent-card");
     let b_title = Label::new(Some(
-        "◆ 60-SECOND ROLLING CRYO-TELEMETRY MATRIX (READ-ONLY · ZERO HARDWARE WRITES)",
+        "◆ 60-SECOND ROLLING CRYO-TELEMETRY MATRIX (READ-ONLY · ZERO WRITES)",
     ));
     b_title.add_css_class("card-title");
     b_title.set_hexpand(true);
-    b_title.set_halign(Align::Start);
+    b_title.set_xalign(0.0);
+    b_title.set_width_chars(12);
+    b_title.set_ellipsize(EllipsizeMode::End);
+
     let b_meta = Label::new(Some("--"));
-    b_meta.add_css_class("cryo-chip");
+    b_meta.add_css_class("card-subtitle");
+    b_meta.set_hexpand(true);
+    b_meta.set_xalign(0.0);
+    b_meta.set_width_chars(12);
+    b_meta.set_ellipsize(EllipsizeMode::End);
     banner.append(&b_title);
     banner.append(&b_meta);
     outer.append(&banner);
-
-    let grid = Grid::builder()
-        .column_spacing(16)
-        .row_spacing(16)
-        .hexpand(true)
-        .build();
 
     // Helper to build a telemetry card
     let make_card = |title: &str,
@@ -127,8 +127,10 @@ pub fn build_telem_view() -> TelemViewHandles {
         let hdr = GtkBox::new(Orientation::Horizontal, 8);
         let t_lbl = Label::new(Some(title));
         t_lbl.add_css_class("card-title");
-        t_lbl.set_halign(Align::Start);
+        t_lbl.set_xalign(0.0);
         t_lbl.set_hexpand(true);
+        t_lbl.set_width_chars(10);
+        t_lbl.set_ellipsize(EllipsizeMode::End);
 
         let val_lbl = Label::new(Some("--"));
         val_lbl.add_css_class("cryo-chip");
@@ -137,11 +139,13 @@ pub fn build_telem_view() -> TelemViewHandles {
 
         let sub_lbl = Label::new(Some("--"));
         sub_lbl.add_css_class("card-subtitle");
-        sub_lbl.set_halign(Align::Start);
-        sub_lbl.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+        sub_lbl.set_xalign(0.0);
+        sub_lbl.set_hexpand(true);
+        sub_lbl.set_width_chars(10);
+        sub_lbl.set_ellipsize(EllipsizeMode::End);
 
         let area = DrawingArea::builder()
-            .content_width(250)
+            .content_width(220)
             .content_height(130)
             .hexpand(true)
             .build();
@@ -210,14 +214,21 @@ pub fn build_telem_view() -> TelemViewHandles {
         (0.98, 0.44, 0.52),
     );
 
-    grid.attach(&c_cpu, 0, 0, 1, 1);
-    grid.attach(&c_gpu, 1, 0, 1, 1);
-    grid.attach(&c_fan, 0, 1, 1, 1);
-    grid.attach(&c_igpu, 1, 1, 1, 1);
-    grid.attach(&c_mem, 0, 2, 1, 1);
-    grid.attach(&c_bat, 1, 2, 1, 1);
+    let row1 = responsive_box(14);
+    row1.append(&c_cpu);
+    row1.append(&c_gpu);
 
-    outer.append(&grid);
+    let row2 = responsive_box(14);
+    row2.append(&c_fan);
+    row2.append(&c_igpu);
+
+    let row3 = responsive_box(14);
+    row3.append(&c_mem);
+    row3.append(&c_bat);
+
+    outer.append(&row1);
+    outer.append(&row2);
+    outer.append(&row3);
     scroll.set_child(Some(&outer));
 
     let refresh_ui: Rc<dyn Fn(&ffi::HwSnapshot)> = Rc::new(move |snap: &ffi::HwSnapshot| {
@@ -262,7 +273,7 @@ pub fn build_telem_view() -> TelemViewHandles {
         ));
 
         v_fan.set_text(&format!(
-            "CPU {} RPM · GPU {} RPM",
+            "CPU {} · GPU {} RPM",
             snap.raw.rpm_cpu.max(0),
             snap.raw.rpm_gpu.max(0)
         ));
@@ -272,11 +283,12 @@ pub fn build_telem_view() -> TelemViewHandles {
             if snap.raw.fan_gpu_on != 0 { "ON" } else { "OFF" }
         ));
 
-        v_igpu.set_text(&format!(
-            "CPU {} MHz · iGPU {} °C",
-            snap.raw.cpu_mhz_cur,
-            snap.raw.igpu_temp
-        ));
+        let igpu_suffix = if snap.raw.igpu_temp > 0 {
+            format!(" · iGPU {} °C", snap.raw.igpu_temp)
+        } else {
+            String::new()
+        };
+        v_igpu.set_text(&format!("{} MHz{}", snap.raw.cpu_mhz_cur, igpu_suffix));
         s_igpu.set_text(&format!(
             "EPP: {} · Display: {} Hz",
             snap.epp_name(),
@@ -287,20 +299,31 @@ pub fn build_telem_view() -> TelemViewHandles {
             "{} / {} MB",
             snap.raw.mem_used_mb, snap.raw.mem_total_mb
         ));
+        let dimm_str = if snap.raw.ram_temp0 > 0 || snap.raw.ram_temp1 > 0 {
+            format!(
+                "DIMM Temps: {}/{} °C · ",
+                snap.raw.ram_temp0.max(0),
+                snap.raw.ram_temp1.max(0)
+            )
+        } else {
+            String::new()
+        };
         s_mem.set_text(&format!(
-            "DIMM Temps: {}/{} °C · Swap: {}/{} MB",
-            snap.raw.ram_temp0, snap.raw.ram_temp1, snap.raw.swap_used_mb, snap.raw.swap_total_mb
+            "{}Swap: {}/{} MB",
+            dimm_str, snap.raw.swap_used_mb, snap.raw.swap_total_mb
         ));
 
-        v_bat.set_text(&format!(
-            "{}% · {}",
-            snap.raw.bat_pct, snap.bat_power_fmt
-        ));
+        v_bat.set_text(&format!("{}% · {}", snap.raw.bat_pct, snap.bat_power_fmt));
+        let nvme_str = if snap.raw.nvme_temp0 > 0 {
+            format!(" · NVMe: {} °C", snap.raw.nvme_temp0)
+        } else {
+            String::new()
+        };
         s_bat.set_text(&format!(
-            "Status: {} (Limit {}%) · NVMe: {} °C · Disk /: {}/{} MB",
+            "Status: {} (Limit {}%){} · Disk /: {}/{} MB",
             snap.bat_status,
             snap.raw.bat_limit,
-            snap.raw.nvme_temp0,
+            nvme_str,
             snap.raw.fs_used_mb,
             snap.raw.fs_total_mb
         ));

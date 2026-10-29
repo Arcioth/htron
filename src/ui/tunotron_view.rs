@@ -5,12 +5,12 @@ use std::rc::Rc;
 use gtk4::pango::EllipsizeMode;
 use gtk4::prelude::*;
 use gtk4::{
-    Align, Box as GtkBox, Button, DrawingArea, Entry, GestureClick, Label, Orientation, PolicyType,
+    Box as GtkBox, Button, DrawingArea, Entry, GestureClick, Label, Orientation, PolicyType,
     ScrolledWindow,
 };
 
 use crate::audio::{format_mmss, AudioCmd, AudioEngineHandle, BrowserEntry, PlayState};
-use crate::ui::draw_cryo_grid;
+use crate::ui::{draw_cryo_grid, flow_add, flow_row, responsive_box};
 
 #[derive(Clone)]
 pub struct TunotronViewHandles {
@@ -31,10 +31,9 @@ pub fn build_tunotron_view(
     outer.set_vexpand(true);
 
     // =====================================================================
-    // ROW 1: NOW PLAYING CRYO-STAGE + DSP / RADIO STUDIO (PINNED TOP)
+    // ROW 1: NOW PLAYING CRYO-STAGE + DSP / RADIO STUDIO (RESPONSIVE)
     // =====================================================================
-    let top_row = GtkBox::new(Orientation::Horizontal, 12);
-    top_row.set_hexpand(true);
+    let top_row = responsive_box(12);
 
     let stage_card = GtkBox::new(Orientation::Vertical, 8);
     stage_card.add_css_class("serpent-card");
@@ -43,8 +42,9 @@ pub fn build_tunotron_view(
     let stage_hdr = GtkBox::new(Orientation::Horizontal, 8);
     let st_title = Label::new(Some("◆ TUNOTRON AUDIO DECK"));
     st_title.add_css_class("card-title");
-    st_title.set_halign(Align::Start);
+    st_title.set_xalign(0.0);
     st_title.set_hexpand(true);
+    st_title.set_width_chars(10);
     st_title.set_ellipsize(EllipsizeMode::End);
 
     let cache_badge = Label::new(Some("JAILED · 0 CACHED"));
@@ -55,7 +55,7 @@ pub fn build_tunotron_view(
 
     let track_headline = Label::new(Some("No Track Playing"));
     track_headline.add_css_class("metric-huge");
-    track_headline.set_halign(Align::Start);
+    track_headline.set_xalign(0.0);
     track_headline.set_hexpand(true);
     track_headline.set_width_chars(10);
     track_headline.set_ellipsize(EllipsizeMode::End);
@@ -64,7 +64,7 @@ pub fn build_tunotron_view(
         "Click any song or ▶ button in the list below to start playback",
     ));
     track_subline.add_css_class("card-subtitle");
-    track_subline.set_halign(Align::Start);
+    track_subline.set_xalign(0.0);
     track_subline.set_hexpand(true);
     track_subline.set_width_chars(12);
     track_subline.set_ellipsize(EllipsizeMode::End);
@@ -73,8 +73,8 @@ pub fn build_tunotron_view(
     stage_card.append(&track_subline);
 
     let wave_canvas = DrawingArea::builder()
-        .content_width(240)
-        .content_height(78)
+        .content_width(220)
+        .content_height(56)
         .hexpand(true)
         .build();
 
@@ -111,7 +111,7 @@ pub fn build_tunotron_view(
                 } else {
                     0.14 + 0.12 * (i as f64 * 0.5).sin().abs()
                 };
-                let bh = (amp * (hf - 26.0)).max(4.0);
+                let bh = (amp * (hf - 24.0)).max(4.0);
                 let by = (hf - 14.0 - bh) * 0.5 + 3.0;
 
                 if norm <= ratio {
@@ -154,8 +154,8 @@ pub fn build_tunotron_view(
 
     stage_card.append(&wave_canvas);
 
-    // Interactive Transport & Seek Controls right inside the Deck Stage
-    let transport_row = GtkBox::new(Orientation::Horizontal, 6);
+    // Interactive Transport & Seek Controls right inside the Deck Stage (wrapping FlowBox)
+    let transport_row = flow_row();
     let btn_st_prev = Button::with_label("⏮ Prev");
     btn_st_prev.add_css_class("cryo-btn");
     let btn_st_back10 = Button::with_label("⏪ -10s");
@@ -196,30 +196,26 @@ pub fn build_tunotron_view(
 
     let time_chip = Label::new(Some("00:00 / 00:00"));
     time_chip.add_css_class("cryo-chip");
-    time_chip.set_hexpand(true);
-    time_chip.set_halign(Align::End);
 
-    transport_row.append(&btn_st_prev);
-    transport_row.append(&btn_st_back10);
-    transport_row.append(&btn_st_play);
-    transport_row.append(&btn_st_fwd10);
-    transport_row.append(&btn_st_next);
-    transport_row.append(&btn_st_stop);
-    transport_row.append(&time_chip);
+    flow_add(&transport_row, &btn_st_prev);
+    flow_add(&transport_row, &btn_st_back10);
+    flow_add(&transport_row, &btn_st_play);
+    flow_add(&transport_row, &btn_st_fwd10);
+    flow_add(&transport_row, &btn_st_next);
+    flow_add(&transport_row, &btn_st_stop);
+    flow_add(&transport_row, &time_chip);
     stage_card.append(&transport_row);
 
-    // DSP & Stream Card (compact width so it never crowds the window)
+    // DSP & Stream Card
     let dsp_card = GtkBox::new(Orientation::Vertical, 8);
     dsp_card.add_css_class("serpent-card");
-    dsp_card.set_size_request(265, -1);
 
     let dsp_title = Label::new(Some("◆ DSP EQUALIZER & RADIO"));
     dsp_title.add_css_class("card-title");
-    dsp_title.set_halign(Align::Start);
+    dsp_title.set_xalign(0.0);
     dsp_card.append(&dsp_title);
 
-    let eq_row1 = GtkBox::new(Orientation::Horizontal, 4);
-    let eq_row2 = GtkBox::new(Orientation::Horizontal, 4);
+    let eq_flow = flow_row();
     let eq_presets: &[(&str, &str)] = &[
         ("Flat", ""),
         ("Bass Boost", "bass=g=9:f=110:w=0.6"),
@@ -231,7 +227,8 @@ pub fn build_tunotron_view(
         ("8D Audio", "apulsator=hz=0.125"),
         ("Crystal Treble", "treble=g=6:f=3500"),
     ];
-    for (i, &(name, flt)) in eq_presets.iter().enumerate() {
+    let mut eq_btns: Vec<(String, Button)> = Vec::new();
+    for &(name, flt) in eq_presets {
         let b = Button::with_label(name);
         b.add_css_class("cryo-btn");
         let aud = Rc::clone(&audio);
@@ -245,36 +242,33 @@ pub fn build_tunotron_view(
             });
             scb(&format!("Applied Tunotron DSP profile: {}", n_str));
         });
-        if i < 3 {
-            eq_row1.append(&b);
-        } else {
-            eq_row2.append(&b);
-        }
+        flow_add(&eq_flow, &b);
+        eq_btns.push((name.to_string(), b));
     }
-    dsp_card.append(&eq_row1);
-    dsp_card.append(&eq_row2);
+    dsp_card.append(&eq_flow);
 
-    let spd_row = GtkBox::new(Orientation::Horizontal, 4);
+    let spd_flow = flow_row();
     let spd_lbl = Label::new(Some("Speed:"));
     spd_lbl.add_css_class("dim-label");
-    spd_row.append(&spd_lbl);
-    for spd in [0.85, 1.0, 1.15, 1.25] {
+    flow_add(&spd_flow, &spd_lbl);
+    let mut spd_btns: Vec<(f64, Button)> = Vec::new();
+    for spd in [0.85f64, 1.0, 1.15, 1.25] {
         let b = Button::with_label(&format!("{:.2}×", spd));
         b.add_css_class("cryo-btn");
         let aud = Rc::clone(&audio);
         b.connect_clicked(move |_| {
             aud.send(AudioCmd::SetSpeed(spd));
         });
-        spd_row.append(&b);
+        flow_add(&spd_flow, &b);
+        spd_btns.push((spd, b));
     }
-    dsp_card.append(&spd_row);
+    dsp_card.append(&spd_flow);
 
-    let radio_lbl = Label::new(Some("LIVE RADIO STREAMS"));
-    radio_lbl.add_css_class("rail-section-label");
-    radio_lbl.set_halign(Align::Start);
-    dsp_card.append(&radio_lbl);
+    let radio_flow = flow_row();
+    let radio_lbl = Label::new(Some("Radio:"));
+    radio_lbl.add_css_class("dim-label");
+    flow_add(&radio_flow, &radio_lbl);
 
-    let streams_row = GtkBox::new(Orientation::Horizontal, 4);
     for (title, url) in [
         ("Groove Salad", "https://ice6.somafm.com/groovesalad-256-mp3"),
         ("Drone Zone", "https://ice6.somafm.com/dronezone-256-mp3"),
@@ -293,9 +287,9 @@ pub fn build_tunotron_view(
             });
             scb(&format!("Streaming live radio: {}", t_s));
         });
-        streams_row.append(&b);
+        flow_add(&radio_flow, &b);
     }
-    dsp_card.append(&streams_row);
+    dsp_card.append(&radio_flow);
 
     top_row.append(&stage_card);
     top_row.append(&dsp_card);
@@ -310,7 +304,7 @@ pub fn build_tunotron_view(
     lib_card.set_vexpand(true);
 
     let nav_bar = GtkBox::new(Orientation::Horizontal, 8);
-    let btn_up = Button::with_label("⬆ Parent Dir");
+    let btn_up = Button::with_label("⬆ Parent");
     btn_up.add_css_class("cryo-btn");
     {
         let aud = Rc::clone(&audio);
@@ -321,18 +315,19 @@ pub fn build_tunotron_view(
 
     let path_lbl = Label::new(Some("~/Music"));
     path_lbl.add_css_class("card-title");
-    path_lbl.set_halign(Align::Start);
+    path_lbl.set_xalign(0.0);
     path_lbl.set_hexpand(true);
-    path_lbl.set_width_chars(10);
+    path_lbl.set_width_chars(8);
     path_lbl.set_ellipsize(EllipsizeMode::End);
 
     let search_entry = Entry::builder()
         .placeholder_text("Filter folder or track...")
-        .width_chars(16)
+        .width_chars(14)
         .build();
 
-    let btn_clear_q = Button::with_label("Clear Queue");
+    let btn_clear_q = Button::with_label("Clear Q");
     btn_clear_q.add_css_class("cryo-btn");
+    btn_clear_q.set_tooltip_text(Some("Clear queued tracks"));
     {
         let aud = Rc::clone(&audio);
         btn_clear_q.connect_clicked(move |_| {
@@ -349,6 +344,7 @@ pub fn build_tunotron_view(
     let list_scroll = ScrolledWindow::builder()
         .hscrollbar_policy(PolicyType::Never)
         .vscrollbar_policy(PolicyType::Automatic)
+        .min_content_height(180)
         .hexpand(true)
         .vexpand(true)
         .build();
@@ -409,8 +405,9 @@ pub fn build_tunotron_view(
                         });
 
                         let lbl = Label::new(Some("📁  .. (Parent Directory)"));
-                        lbl.set_halign(Align::Start);
+                        lbl.set_xalign(0.0);
                         lbl.set_hexpand(true);
+                        lbl.set_width_chars(10);
                         lbl.set_ellipsize(EllipsizeMode::End);
 
                         row.append(&btn);
@@ -433,12 +430,12 @@ pub fn build_tunotron_view(
                         });
 
                         let lbl = Label::new(Some(&format!("📁  {}", name)));
-                        lbl.add_css_class("card-title");
-                        lbl.set_halign(Align::Start);
+                        lbl.add_css_class("folder-label");
+                        lbl.set_xalign(0.0);
                         lbl.set_hexpand(true);
+                        lbl.set_width_chars(8);
                         lbl.set_ellipsize(EllipsizeMode::End);
 
-                        // Also allow clicking the folder label directly
                         let click = GestureClick::new();
                         let aud_row = Rc::clone(&aud);
                         let target_row = path.clone();
@@ -468,7 +465,6 @@ pub fn build_tunotron_view(
                             row.add_css_class("track-row-playing");
                         }
 
-                        // Primary Play/Pause button on the LEFT so it is never pushed off-screen
                         let play_lbl = if is_playing {
                             "⏸ Pause"
                         } else if is_current {
@@ -496,18 +492,19 @@ pub fn build_tunotron_view(
                             });
                         }
 
-                        let display_str = if track.artist == "Unknown Artist" || track.artist.is_empty() {
-                            track.title.clone()
-                        } else {
-                            format!("{} — {}", track.artist, track.title)
-                        };
+                        let display_str =
+                            if track.artist == "Unknown Artist" || track.artist.is_empty() {
+                                track.title.clone()
+                            } else {
+                                format!("{} — {}", track.artist, track.title)
+                            };
                         let title_lbl = Label::new(Some(&display_str));
-                        title_lbl.set_halign(Align::Start);
+                        title_lbl.set_xalign(0.0);
                         title_lbl.set_hexpand(true);
-                        title_lbl.set_width_chars(12);
+                        title_lbl.set_width_chars(10);
                         title_lbl.set_ellipsize(EllipsizeMode::End);
+                        title_lbl.set_tooltip_text(Some(&display_str));
 
-                        // Clicking the track title also plays/toggles the track
                         {
                             let click = GestureClick::new();
                             let aud_t = Rc::clone(&aud);
@@ -573,6 +570,21 @@ pub fn build_tunotron_view(
             ));
             path_lbl.set_text(&format!("🔒 {}", snap.current_dir.display()));
 
+            for (name, btn) in &eq_btns {
+                if *name == snap.active_filter_name {
+                    btn.add_css_class("cryo-btn-active");
+                } else {
+                    btn.remove_css_class("cryo-btn-active");
+                }
+            }
+            for (spd, btn) in &spd_btns {
+                if (snap.speed - *spd).abs() < 0.02 {
+                    btn.add_css_class("cryo-btn-active");
+                } else {
+                    btn.remove_css_class("cryo-btn-active");
+                }
+            }
+
             match snap.state {
                 PlayState::Playing => b_st_play.set_label("⏸ Pause"),
                 PlayState::Paused => b_st_play.set_label("▶ Resume"),
@@ -595,7 +607,8 @@ pub fn build_tunotron_view(
                 ));
             } else {
                 track_headline.set_text("Tunotron Deck Ready");
-                track_subline.set_text("Click ▶ Play on any track below or launch a SomaFM radio stream");
+                track_subline
+                    .set_text("Click ▶ Play on any track below or launch a SomaFM radio stream");
             }
 
             rl(false);

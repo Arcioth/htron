@@ -230,7 +230,7 @@ pub fn probe_track_metadata(path: &Path) -> Option<Track> {
     }
 
     if !got_duration {
-        if let Ok(out) = std::process::Command::new("ffprobe")
+        if let Ok(out) = std::process::Command::new(resolve_bin("ffprobe"))
             .args([
                 "-v",
                 "error",
@@ -577,6 +577,33 @@ impl Drop for MpvGuard {
     }
 }
 
+/// Resolves external audio helper binaries reliably on NixOS & standard Linux
+/// even when launched from `.desktop` runners with minimal `PATH`.
+fn resolve_bin(name: &str) -> String {
+    let nix_sys = format!("/run/current-system/sw/bin/{}", name);
+    if Path::new(&nix_sys).exists() {
+        return nix_sys;
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let nix_prof = format!("{}/.nix-profile/bin/{}", home, name);
+        if Path::new(&nix_prof).exists() {
+            return nix_prof;
+        }
+    }
+    name.to_string()
+}
+
+fn effective_clock_speed(filter_name: &str, base_speed: f64) -> f64 {
+    let lower = filter_name.to_lowercase();
+    if lower.contains("nightcore") {
+        1.22
+    } else if lower.contains("slowed") || lower.contains("vapor") {
+        0.84
+    } else {
+        base_speed
+    }
+}
+
 /// Native PipeWire / ffplay fallback audio backend when `mpv` is not installed on NixOS.
 struct FfplayPlayer {
     child: Option< std::process::Child >,
@@ -654,7 +681,7 @@ impl FfplayPlayer {
             volume.round().clamp(0.0, 100.0) as i32
         };
 
-        let mut cmd = std::process::Command::new("ffplay");
+        let mut cmd = std::process::Command::new(resolve_bin("ffplay"));
         cmd.args([
             "-nodisp",
             "-autoexit",
@@ -717,7 +744,7 @@ impl FfplayPlayer {
             } else {
                 (volume / 100.0).clamp(0.0, 1.0)
             };
-            let _ = std::process::Command::new("wpctl")
+            let _ = std::process::Command::new(resolve_bin("wpctl"))
                 .args(["set-volume", "-p", &pid_str, &format!("{:.2}", frac)])
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
@@ -756,7 +783,7 @@ async fn spawn_mpv() -> Result<(MpvGuard, UnixStream)> {
     let _ = fs::remove_file(&socket_path);
 
     let parent_pid = unsafe { libc::getpid() };
-    let mut cmd = Command::new("mpv");
+    let mut cmd = Command::new(resolve_bin("mpv"));
     cmd.args([
         "--no-video",
         "--audio-display=no",
@@ -1576,7 +1603,10 @@ pub fn start_audio_engine(music_root: PathBuf) -> AudioEngineHandle {
                                         ffplay.set_paused(true);
                                     }
                                 }
-                                clock.set_speed(s);
+                                clock.set_speed(effective_clock_speed(
+                                    &state_clone.read().unwrap().active_filter_name,
+                                    s,
+                                ));
                                 state_clone.write().unwrap().speed = s;
                             }
                             AudioCmd::ToggleMute => {
@@ -1638,6 +1668,10 @@ pub fn start_audio_engine(music_root: PathBuf) -> AudioEngineHandle {
                                         ffplay.set_paused(true);
                                     }
                                 }
+                                clock.set_speed(effective_clock_speed(
+                                    &name,
+                                    state_clone.read().unwrap().speed,
+                                ));
                                 state_clone.write().unwrap().active_filter_name = name;
                             }
                             AudioCmd::AddToQueue(track) => {
